@@ -134,3 +134,15 @@ th{background:var(--yellow);font-size:12px}
 .form.f3{grid-template-columns:repeat(3,minmax(0,1fr))}
 @media (max-width:600px){.form.f3{grid-template-columns:1fr}}
 select{appearance:auto}
+
+/* contador entre pasos y alerta de demora */
+.crono{font-family:var(--mono);font-size:13px;font-weight:bold;background:rgba(255,255,255,.15);border-radius:5px;padding:6px 9px;white-space:nowrap}
+.crono.tarde{background:#ff1a1a;color:#fff;animation:parpadeo .8s steps(2,start) infinite}
+.alerta-paso{position:sticky;top:calc(env(safe-area-inset-top,0px) + 64px);z-index:6;margin:0 0 10px;background:#ff1a1a;color:#fff;border:3px solid #7a0000;border-radius:6px;padding:12px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;animation:parpadeoFondo 1s ease-in-out infinite}
+.alerta-paso b{font-size:18px;flex:1 1 100%}
+.alerta-paso span{flex:1 1 240px}
+.alerta-paso button{background:#fff;color:#7a0000;border-color:#fff;font-weight:bold}
+body.en-alerta .sec.cur .box{box-shadow:0 0 0 4px #ff1a1a}
+@keyframes parpadeo{to{visibility:hidden}}
+@keyframes parpadeoFondo{50%{background:#b30000}}
+@media (prefers-reduced-motion:reduce){.crono.tarde,.alerta-paso{animation:none}}

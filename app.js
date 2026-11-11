@@ -3,7 +3,7 @@
    Los registros se guardan en el dispositivo (IndexedDB) y se exportan como evidencia. */
 "use strict";
 
-const APP_VERSION = "1.3.0";
+const APP_VERSION = "1.4.0";
 const MAX_CICLOS = 8;
 const MAX_FOTOS = 4;
 const ENTIDAD = { nombre: "Unidad de Búsqueda de Personas Dadas por Desaparecidas", sigla: "UBPD", logo: "img/logo-ubpd.png" };
@@ -332,6 +332,9 @@ function mostrarPiloto(sfx = "") {
   const box = $("#pilotoRes" + sfx); if (!box) return;
   const cc = soloDig($("#cedula" + sfx).value); const p = buscarPiloto(cc);
   S["pilotoSel" + sfx] = p || null;
+  const firma = cc + "|" + (sfx ? soloDig($("#cedula").value) : "") + "|" + !!p;
+  if (box.dataset.firma === firma) return; // misma cédula: no rehacer (conserva lo escrito a mano)
+  box.dataset.firma = firma;
   if (!cc) { box.innerHTML = ""; return; }
   if (sfx && cc === soloDig($("#cedula").value)) { box.innerHTML = `<div class="banner" style="margin-top:8px">El Piloto No. 2 no puede ser el mismo Piloto No. 1.</div>`; S.pilotoSel2 = null; return; }
   if (p) {
@@ -404,7 +407,8 @@ function vRun() {
     <div class="row"><button class="pri" data-a="cerrar">Cerrar y firmar registro</button></div></div>` : "";
   return `<div class="sheet">
     <div class="topbar noprint"><div class="info"><b>${esc(L.meta.corto)} · ${esc(rec.matricula || rec.serial)}</b> — OV ${esc(ordenTxt(rec))}<br>${esc(rec.piloto)} · inicio ${fmtT(rec.inicio)} · ${P.done}/${P.total}<div class="bar"><i style="width:${pct}%"></i></div></div>
-      ${P.next ? `<button data-a="ir">Ir al paso actual</button>` : ""}<button data-a="home">Salir</button></div>
+      <span id="crono" class="crono" hidden></span>${P.next ? `<button data-a="ir">Ir al paso actual</button>` : ""}<button data-a="home">Salir</button></div>
+    <div id="alertaPaso" class="alerta-paso noprint" hidden role="alert"></div>
     ${header(L, rec.revision)}<div class="acft">${esc(L.meta.aeronave)}</div>
     ${hojaSecciones(rec, true)}
     ${cierre}
@@ -420,7 +424,7 @@ function datosVuelo(rec) {
     <div><b>Lugar</b>${esc(rec.lugar)}</div><div><b>Piloto No. 2</b>${rec.piloto2 ? `${esc(rec.piloto2.nombre)}${rec.piloto2.manual ? ` <span class="chip nov">manual</span>` : ""}<div class="small">C.C. ${esc(rec.piloto2.cedula)} · ${esc(rec.piloto2.cipu)}${rec.piloto2.vigencia ? " · " + esc(rec.piloto2.vigencia) : ""}</div>` : esc(rec.observador || "—")}</div><div><b>Mantenimiento 6 meses</b>${rec.mantVencido ? `<span class="chip nov">Vencido (${esc(rec.proxMant6)})</span>` : esc(rec.proxMant6 ? "Al día hasta " + rec.proxMant6 : "—")}</div>
     <div><b>Inicio</b>${esc(fmtDT(rec.inicio))}</div><div><b>Cierre</b>${esc(fmtDT(rec.fin))}</div>
     <div><b>Duración</b>${esc(dur(rec.inicio, rec.fin))}</div><div><b>GPS inicio</b>${esc(gpsTxt(rec.gpsInicio))}</div><div><b>GPS cierre</b>${esc(gpsTxt(rec.gpsCierre))}</div>
-    <div><b>Ciclos cambio de batería</b>${nCiclos(rec)}</div><div><b>Correcciones</b>${(rec.bitacora || []).filter(b => b.accion === "corrección").length}</div><div><b>Equipo</b>${esc(rec.equipo || "—")}</div>
+    <div><b>Ciclos cambio de batería</b>${nCiclos(rec)}</div><div><b>Correcciones</b>${(rec.bitacora || []).filter(b => b.accion === "corrección").length}</div><div><b>Alertas por demora (&gt;30 s)</b>${(rec.bitacora || []).filter(b => b.accion === "alerta-inactividad").length}</div><div><b>Equipo</b>${esc(rec.equipo || "—")}</div>
   </div>`;
 }
 function bloqueEvidencia(rec) {
@@ -494,7 +498,62 @@ function irAlPaso() {
   const el = document.getElementById("k_" + P.next.key.replace(/\./g, "_")) || document.querySelector(".sec.cur");
   el?.scrollIntoView({ block: "center", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
 }
+/* ---------------- contador entre pasos: alerta a los 30 segundos ---------------- */
+const LIMITE_SEG = 30, REPETIR_SONIDO_SEG = 10;
+let audioCtx = null;
+function prepararAudio() { // debe llamarse desde un toque del usuario (requisito de iOS)
+  try { audioCtx ||= new (window.AudioContext || window.webkitAudioContext)(); if (audioCtx.state === "suspended") audioCtx.resume(); } catch (e) { }
+}
+function pitar() {
+  if (!audioCtx) return;
+  try {
+    const t0 = audioCtx.currentTime;
+    [0, 0.35, 0.7].forEach(d => {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = "square"; o.frequency.value = 1046; o.connect(g); g.connect(audioCtx.destination);
+      g.gain.setValueAtTime(0.0001, t0 + d); g.gain.exponentialRampToValueAtTime(0.35, t0 + d + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t0 + d + 0.25);
+      o.start(t0 + d); o.stop(t0 + d + 0.27);
+    });
+  } catch (e) { }
+  try { navigator.vibrate?.([300, 150, 300]); } catch (e) { }
+}
+let wakeLock = null;
+async function mantenerPantalla(on) {
+  try { if (on && !wakeLock && navigator.wakeLock) { wakeLock = await navigator.wakeLock.request("screen"); wakeLock.addEventListener("release", () => wakeLock = null); } if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; } } catch (e) { }
+}
+/* Devuelve la sección empezada y no terminada, con el segundo desde el último paso marcado. */
+function estadoCrono(rec) {
+  const P = progreso(rec); if (!P.next || rec.estado === "cerrada") return null;
+  const gk = p => p.sec.id + (p.ciclo ? "#" + p.ciclo : "");
+  const grupo = P.st.filter(p => gk(p) === gk(P.next));
+  const hechos = grupo.map(p => rec.resp[p.key]).filter(Boolean);
+  if (!hechos.length) return null; // la sección no ha empezado: no se cuenta (p. ej. durante el vuelo)
+  const ult = hechos.map(r => r.t).sort().pop();
+  return { sec: P.next.sec, ciclo: P.next.ciclo, ult, seg: Math.floor((Date.now() - new Date(ult)) / 1000) };
+}
+const mmss = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+setInterval(async () => {
+  const c = $("#crono"), al = $("#alertaPaso");
+  if (S.view !== "run" || !S.cur || !c) { document.body.classList.remove("en-alerta"); return; }
+  const e = estadoCrono(S.cur);
+  if (!e) { c.hidden = true; al.hidden = true; document.body.classList.remove("en-alerta"); return; }
+  const tarde = e.seg >= LIMITE_SEG;
+  c.hidden = false; c.classList.toggle("tarde", tarde);
+  c.textContent = tarde ? `⚠ ${mmss(e.seg)} detenido` : `Sección ${e.sec.id} · ${mmss(e.seg)} / ${mmss(LIMITE_SEG)}`;
+  document.body.classList.toggle("en-alerta", tarde);
+  al.hidden = !tarde;
+  if (tarde) {
+    al.innerHTML = `<b>¡CONTINÚE LA LISTA DE CHEQUEO!</b><span>La sección ${esc(e.sec.id)} – ${esc(e.sec.t)} lleva ${mmss(e.seg)} sin avanzar. No la deje a medias.</span><button data-a="ir">Ir al paso pendiente</button>`;
+    if (S._pitidoDe !== e.ult || Date.now() - S._ultPitido >= REPETIR_SONIDO_SEG * 1000) { S._pitidoDe = e.ult; S._ultPitido = Date.now(); pitar(); }
+    if (S.cur._alertaDe !== e.ult) { // una anotación por cada detención
+      S.cur._alertaDe = e.ult; log(S.cur, "alerta-inactividad", { seccion: e.sec.id + (e.ciclo ? " ciclo " + e.ciclo : ""), desde: e.ult });
+      await guardar(S.cur);
+    }
+  }
+}, 1000);
+
 async function responder(key, r, n) {
+  prepararAudio(); mantenerPantalla(true);
   const rec = S.cur; if (rec.estado === "cerrada") return;
   if (progreso(rec).next?.key !== key) return; // obliga el orden
   rec.resp[key] = { r, t: nowIso(), ...(n ? { n } : {}) }; rec._ult = key; S.noteFor = null;
@@ -504,7 +563,7 @@ async function responder(key, r, n) {
 document.addEventListener("click", async ev => {
   const b = ev.target.closest("[data-a]"); if (!b) return;
   const a = b.dataset.a, id = b.dataset.id;
-  if (a === "home") { S.view = "home"; S.cur = null; S.confirmBorrar = null; render(); scrollTo(0, 0); }
+  if (a === "home") { mantenerPantalla(false); S.view = "home"; S.cur = null; S.confirmBorrar = null; render(); scrollTo(0, 0); }
   else if (a === "nueva") { S.listaId = b.dataset.l; S.view = "nuevo"; render(); scrollTo(0, 0); }
   else if (a === "continuar") { const r = S.recs.find(x => x.id === id); if (!r) return; S.cur = JSON.parse(JSON.stringify(r)); S.view = "run"; render(); setTimeout(irAlPaso, 60); }
   else if (a === "ver") { S.verId = id; S.view = "ver"; render(); scrollTo(0, 0); }
@@ -535,7 +594,7 @@ document.addEventListener("click", async ev => {
     b.disabled = true; b.textContent = "Tomando ubicación y cerrando…";
     rec.observaciones = $("#obs").value.trim(); rec.firma = $("#firma").toDataURL("image/png");
     rec.gpsCierre = await tomarGPS(10000);
-    rec.declaracion = true; rec.fin = nowIso(); rec.estado = "cerrada"; delete rec._ult; log(rec, "cierre");
+    mantenerPantalla(false); rec.declaracion = true; rec.fin = nowIso(); rec.estado = "cerrada"; delete rec._ult; log(rec, "cierre");
     rec.hash = await huella(rec);
     await guardar(rec); S.verId = rec.id; S.view = "ver"; S.cur = null; render(); scrollTo(0, 0);
     toast("Registro cerrado y firmado. Exporte la evidencia.", 4000);
