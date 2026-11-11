@@ -74,7 +74,7 @@ La cédula del piloto trae automáticamente su **nombre, Certificado CIPU, vigen
 
 Cuando cambie el personal o la flota, actualice el Excel y vuelva a tocar **Actualizar Excel** en cada iPad.
 
-**Aeronaves:** la lista desplegable de *Serial / Matrícula / RUAS* muestra solo las aeronaves del modelo de la lista elegida (columna MODELO del Excel). Las aeronaves con TERRITORIAL «CASO DE HURTO» se excluyen. Si el mantenimiento de 6 meses está vencido, la app lo advierte y lo deja anotado en la evidencia. La flota también está publicada en `datos/flota.json` (sin datos personales). Al cargar el Excel en un iPad, esa flota reemplaza la publicada.
+**Aeronaves:** la lista desplegable de *Serial / Matrícula / RUAS* muestra solo las aeronaves del modelo de la lista elegida (columna MODELO del Excel). Las aeronaves con TERRITORIAL «CASO DE HURTO» se excluyen, igual que los Matrice M210. Si el mantenimiento de 6 meses está vencido, la app lo advierte y lo deja anotado en la evidencia. La flota también está publicada en `datos/flota.json` (sin datos personales). Al cargar el Excel en un iPad, esa flota reemplaza la publicada.
 
 **Departamento y municipio** salen de la DIVIPOLA oficial del DANE (`datos/divipola.json`).
 

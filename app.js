@@ -249,7 +249,7 @@ async function importarExcel(file) {
         const sub = (rows[i + 1] || []).map(normTxt);
         const cMa = col(h => h === "MARCA"), cMo = col(h => h === "MODELO"), cSe = col(h => h.includes("SERIE AERONAVE")), cMt = col(h => h.startsWith("MATRICULA")), cR = col(h => h.includes("RUAS")), cT = col(h => h.startsWith("TERRITORIAL"));
         const cPm = sub.findIndex(h => h.startsWith("FECHA PROXIMO MANTENIMIENTO"));
-        aeronaves = rows.slice(i + 2).filter(r => r && r[cSe] && r[cMo] && !normTxt(r[cT]).includes("HURTO")).map(r => {
+        aeronaves = rows.slice(i + 2).filter(r => r && r[cSe] && r[cMo] && !normTxt(r[cT]).includes("HURTO") && !normTxt(r[cMo]).includes("M210")).map(r => {
           let ruas = String(r[cR] ?? "").trim(); if (/^x*$/i.test(ruas)) ruas = "";
           return { marca: String(r[cMa] ?? "").trim(), modelo: String(r[cMo]).trim(), serial: String(r[cSe]).trim(), matricula: String(r[cMt] ?? "").trim(), ruas, proxMant6: cPm >= 0 ? fechaISO(r[cPm]) : "" };
         });
