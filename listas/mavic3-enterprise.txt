@@ -1,6 +1,7 @@
 # LISTA DE CHEQUEO - DJI MAVIC 3 ENTERPRISE   (formato: ver LEEME.md)
 aeronave: DJI MAVIC 3 ENTERPRISE
 corto: Mavic 3E
+modelos: MAVIC 3 ENTERPRISE, MAVIC 3E
 tipo: NORMAL CHECK LIST
 fabricante: DJI
 logo: img/logo-dji.png

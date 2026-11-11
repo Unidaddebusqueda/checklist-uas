@@ -62,6 +62,24 @@ Después de abrirla una vez con internet, funciona **sin señal**.
 
 ---
 
+## 2b. Cargar la base de pilotos y aeronaves en cada iPad (una vez)
+
+La cédula del piloto trae automáticamente su **nombre, Certificado CIPU, vigencia y sede**. Para eso, cada iPad necesita el Excel **«LISTADO DE PILOTOS DE DRON.xlsx»** (hojas *Pilotos_Poliza* y *Aeronave_UAS*).
+
+1. Envíe el Excel al iPad por AirDrop, correo, OneDrive o WhatsApp y guárdelo en **Archivos**.
+2. En la app, en la pantalla de inicio, toque **Cargar Excel** y elija el archivo.
+3. La app muestra cuántos pilotos y aeronaves cargó.
+
+> **Protección de datos (Ley 1581 de 2012):** las cédulas **no se publican en internet**. Quedan guardadas solo en el iPad donde se cargó el Excel. **Nunca suba el Excel a GitHub.**
+
+Cuando cambie el personal o la flota, actualice el Excel y vuelva a tocar **Actualizar Excel** en cada iPad.
+
+**Aeronaves:** la lista desplegable de *Serial / Matrícula / RUAS* muestra solo las aeronaves del modelo de la lista elegida (columna MODELO del Excel). Las aeronaves con TERRITORIAL «CASO DE HURTO» se excluyen. Si el mantenimiento de 6 meses está vencido, la app lo advierte y lo deja anotado en la evidencia. La flota también está publicada en `datos/flota.json` (sin datos personales). Al cargar el Excel en un iPad, esa flota reemplaza la publicada.
+
+**Departamento y municipio** salen de la DIVIPOLA oficial del DANE (`datos/divipola.json`).
+
+---
+
 ## 3. Agregar otra aeronave
 
 Cada aeronave es un archivo de texto en la carpeta `listas/`.
@@ -92,7 +110,7 @@ Batería Dron | Reemplazada
 
 | Escriba | Resultado |
 |---|---|
-| `clave: valor` (antes de la primera sección) | Datos del encabezado: aeronave, corto, tipo, fabricante, logo, revision, elaboro |
+| `clave: valor` (antes de la primera sección) | Datos del encabezado: aeronave, corto, modelos (como aparecen en la columna MODELO del Excel, separados por coma), tipo, fabricante, logo, revision, elaboro |
 | `== N \| TÍTULO` | Nueva sección |
 | `== N \| TÍTULO \| rojo` | Título de sección resaltado en rojo |
 | `== N \| TÍTULO \| repetible` | Sección que se puede repetir (pregunta «¿Se realiza?») |

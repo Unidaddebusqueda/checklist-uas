@@ -131,3 +131,6 @@ th{background:var(--yellow);font-size:12px}
   .mk{flex-basis:20px;height:18px;font-size:10px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+.form.f3{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:600px){.form.f3{grid-template-columns:1fr}}
+select{appearance:auto}

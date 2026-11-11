@@ -1,6 +1,7 @@
 # LISTA DE CHEQUEO - DJI MATRICE 4E   (formato: ver LEEME.md)
 aeronave: DJI MATRICE 4E
 corto: Matrice 4E
+modelos: MATRICE-4E, MATRICE 4E
 tipo: NORMAL CHECK LIST
 fabricante: DJI
 logo: img/logo-dji.png

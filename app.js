@@ -3,7 +3,7 @@
    Los registros se guardan en el dispositivo (IndexedDB) y se exportan como evidencia. */
 "use strict";
 
-const APP_VERSION = "1.0.0";
+const APP_VERSION = "1.1.0";
 const MAX_CICLOS = 8;
 const MAX_FOTOS = 4;
 const ENTIDAD = { nombre: "Unidad de Búsqueda de Personas Dadas por Desaparecidas", sigla: "UBPD", logo: "img/logo-ubpd.png" };
@@ -170,7 +170,11 @@ function render() {
   else if (S.view === "verificar") app.innerHTML = vVerificar();
   else { S.view = "home"; app.innerHTML = vHome(); }
   if (S.view === "run") initFirma();
+  if (S.view === "nuevo") initNuevo();
 }
+const ordenTxt = r => r.ordenVuelo || r.mision || "";
+const lugarTxt = r => [r.lugar, r.municipio, r.departamento].filter(Boolean).join(", ");
+const cipuTxt = r => r.cipu || r.licencia || "";
 function chipEstado(r) {
   if (r.estado === "cerrada") return nNov(r) ? `<span class="chip nov">Cerrada · ${nNov(r)} novedad${nNov(r) > 1 ? "es" : ""}</span>` : `<span class="chip ok">Cerrada sin novedad</span>`;
   return `<span class="chip na">En curso</span>`;
@@ -180,13 +184,18 @@ function vHome() {
   const recs = [...S.recs].sort((a, b) => (b.inicio || "").localeCompare(a.inicio || ""));
   const abiertas = recs.filter(r => r.estado !== "cerrada");
   const filtro = (S.filtro || "").toLowerCase();
-  const hist = recs.filter(r => !filtro || [r.piloto, r.serial, r.mision, r.lugar, r.plantilla?.meta?.corto].join(" ").toLowerCase().includes(filtro));
+  const hist = recs.filter(r => !filtro || [r.piloto, r.cedula, r.serial, r.matricula, ordenTxt(r), lugarTxt(r), r.plantilla?.meta?.corto].join(" ").toLowerCase().includes(filtro));
+  const bp = basePilotos(), bf = lsGet("uas_base_flota", null);
   return `<div class="sheet">
     ${header({ meta: { tipo: "LISTAS DE CHEQUEO UAS", fabricante: "Manual de Operaciones" } }, "v" + APP_VERSION)}
     ${S.swWaiting ? `<div class="banner info row" style="margin-top:10px;justify-content:space-between"><span>Hay una versión nueva de la app o de las listas.</span><button class="pri" data-a="actualizar">Actualizar ahora</button></div>` : ""}
     ${!navigator.onLine ? `<div class="banner info" style="margin-top:10px">Sin conexión. La app funciona normalmente; los registros quedan guardados en este equipo.</div>` : ""}
     ${S.errores.map(e => `<div class="banner" style="margin-top:10px">${esc(e)}</div>`).join("")}
-    ${abiertas.length ? `<h2 style="margin-top:14px">Listas sin cerrar</h2>` + abiertas.map(r => { const P = progreso(r); return `<div class="panel navy"><div class="row" style="justify-content:space-between"><div><b>${esc(r.plantilla.meta.corto)}</b> · ${esc(r.serial)} · ${esc(r.mision)}<div class="small muted">${esc(r.piloto)} · inicio ${esc(fmtDT(r.inicio))} · ${P.done}/${P.total} pasos</div></div><div class="row"><button class="lnk" data-a="borrar" data-id="${esc(r.id)}">Descartar</button><button class="pri" data-a="continuar" data-id="${esc(r.id)}">Continuar</button></div></div>${S.confirmBorrar === r.id ? `<div class="banner row" style="justify-content:space-between"><span>¿Descartar esta lista sin cerrar? No se puede recuperar.</span><span class="row"><button data-a="borrar-no">No</button><button class="warn" data-a="borrar-si" data-id="${esc(r.id)}">Sí, descartar</button></span></div>` : ""}</div>`; }).join("") : ""}
+    ${abiertas.length ? `<h2 style="margin-top:14px">Listas sin cerrar</h2>` + abiertas.map(r => { const P = progreso(r); return `<div class="panel navy"><div class="row" style="justify-content:space-between"><div><b>${esc(r.plantilla.meta.corto)}</b> · ${esc(r.matricula || r.serial)} · OV ${esc(ordenTxt(r))}<div class="small muted">${esc(r.piloto)} · inicio ${esc(fmtDT(r.inicio))} · ${P.done}/${P.total} pasos</div></div><div class="row"><button class="lnk" data-a="borrar" data-id="${esc(r.id)}">Descartar</button><button class="pri" data-a="continuar" data-id="${esc(r.id)}">Continuar</button></div></div>${S.confirmBorrar === r.id ? `<div class="banner row" style="justify-content:space-between"><span>¿Descartar esta lista sin cerrar? No se puede recuperar.</span><span class="row"><button data-a="borrar-no">No</button><button class="warn" data-a="borrar-si" data-id="${esc(r.id)}">Sí, descartar</button></span></div>` : ""}</div>`; }).join("") : ""}
+    <div class="panel ${bp ? "" : "navy"}" style="margin-top:14px"><div class="row" style="justify-content:space-between">
+      <div><b>Base de pilotos y aeronaves</b><div class="small muted">${bp ? `${bp.pilotos.length} pilotos${bf ? ` · ${bf.aeronaves.length} aeronaves` : ""} · cargada el ${esc(fmtDT(bp.cargado))} desde «${esc(bp.archivo)}». Se guarda solo en este equipo.` : "Este equipo no tiene la base de pilotos. Cargue el Excel «LISTADO DE PILOTOS DE DRON» para que la cédula traiga los datos automáticamente."}</div></div>
+      <label class="small" style="font-weight:normal"><span class="noprint" style="display:inline-block;padding:10px 14px;border:1px solid var(--navy);border-radius:6px;background:${bp ? "#fff" : "var(--navy)"};color:${bp ? "var(--navy)" : "#fff"};font-weight:bold;cursor:pointer">${bp ? "Actualizar Excel" : "Cargar Excel"}</span><input type="file" id="xlsBase" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden></label>
+    </div></div>
     <h2 style="margin-top:16px">Iniciar lista de chequeo</h2>
     <div class="cards">${S.listas.map(L => `<div class="card">
         ${L.meta.logo ? `<img src="${esc(L.meta.logo)}" alt="" onerror="this.remove()">` : ""}
@@ -195,28 +204,134 @@ function vHome() {
         <button class="pri" data-a="nueva" data-l="${esc(L.id)}">Iniciar</button></div>`).join("") || `<p class="muted">No hay listas cargadas.</p>`}</div>
     <div class="row" style="justify-content:space-between;margin-top:20px"><h2 style="margin:0">Historial en este equipo (${recs.length})</h2>
       <div class="row noprint"><button data-a="csv">Exportar historial (CSV)</button><button data-a="respaldo">Copia de respaldo</button><button data-a="verificar">Verificar evidencia</button></div></div>
-    ${recs.length > 5 ? `<input id="filtro" placeholder="Buscar por piloto, serial, misión o lugar" value="${esc(S.filtro || "")}" style="margin:8px 0">` : ""}
-    <div class="tbl" style="margin-top:8px">${hist.length ? `<table><thead><tr><th>Inicio</th><th>Aeronave</th><th>Piloto</th><th>Misión</th><th>Duración</th><th>Estado</th><th></th></tr></thead><tbody>
-      ${hist.map(r => `<tr><td style="white-space:nowrap">${esc(fmtDT(r.inicio))}</td><td>${esc(r.plantilla.meta.corto)}<div class="small muted">${esc(r.serial)}</div></td><td>${esc(r.piloto)}</td><td>${esc(r.mision)}</td><td>${esc(dur(r.inicio, r.fin))}</td><td>${chipEstado(r)}</td><td><button class="lnk" data-a="ver" data-id="${esc(r.id)}">Ver</button></td></tr>`).join("")}
+    ${recs.length > 5 ? `<input id="filtro" placeholder="Buscar por piloto, cédula, matrícula, orden de vuelo o lugar" value="${esc(S.filtro || "")}" style="margin:8px 0">` : ""}
+    <div class="tbl" style="margin-top:8px">${hist.length ? `<table><thead><tr><th>Inicio</th><th>Aeronave</th><th>Piloto</th><th>Orden de vuelo</th><th>Duración</th><th>Estado</th><th></th></tr></thead><tbody>
+      ${hist.map(r => `<tr><td style="white-space:nowrap">${esc(fmtDT(r.inicio))}</td><td>${esc(r.plantilla.meta.corto)}<div class="small muted">${esc(r.matricula || r.serial)}</div></td><td>${esc(r.piloto)}</td><td>${esc(ordenTxt(r))}<div class="small muted">${esc([r.municipio, r.departamento].filter(Boolean).join(", "))}</div></td><td>${esc(dur(r.inicio, r.fin))}</td><td>${chipEstado(r)}</td><td><button class="lnk" data-a="ver" data-id="${esc(r.id)}">Ver</button></td></tr>`).join("")}
       </tbody></table>` : `<p class="muted" style="padding:14px;margin:0">${recs.length ? "Ningún registro coincide con la búsqueda." : "Todavía no hay registros. Al iniciar una lista de chequeo aparecerá aquí."}</p>`}</div>
     <p class="foot">Los registros se guardan en este equipo. Exporta la evidencia de cada vuelo y haz copias de respaldo periódicas. · v${APP_VERSION}</p>
   </div>`;
 }
 
+/* ---------------- datos de apoyo: pilotos, flota y DIVIPOLA ---------------- */
+const normTxt = s => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim();
+const soloDig = s => String(s ?? "").replace(/\D/g, "");
+const hoyISO = () => new Date().toISOString().slice(0, 10);
+function basePilotos() { return lsGet("uas_base_pilotos", null); }
+function flota() { return lsGet("uas_base_flota", null)?.aeronaves || S.flotaWeb?.aeronaves || []; }
+function flotaDeLista(L) {
+  const mods = (L.meta.modelos || L.meta.aeronave).split(",").map(normTxt).filter(Boolean);
+  return flota().filter(a => mods.includes(normTxt(a.modelo)));
+}
+function buscarPiloto(cc) { const c = soloDig(cc); return c ? (basePilotos()?.pilotos || []).find(p => soloDig(p.cedula) === c) : null; }
+
+async function cargarLibXLSX() {
+  if (window.XLSX) return;
+  await new Promise((res, rej) => { const s = document.createElement("script"); s.src = "vendor/xlsx.full.min.js"; s.onload = res; s.onerror = () => rej(new Error("no se pudo cargar el lector de Excel")); document.head.appendChild(s); });
+}
+function filasHoja(ws) { return XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null }); }
+function fechaISO(v) { if (v instanceof Date && !isNaN(v)) return new Date(v.getTime() - v.getTimezoneOffset() * 60000).toISOString().slice(0, 10); return ""; }
+async function importarExcel(file) {
+  await cargarLibXLSX();
+  const wb = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true });
+  let pilotos = null, aeronaves = null;
+  for (const name of wb.SheetNames) {
+    const rows = filasHoja(wb.Sheets[name]);
+    for (let i = 0; i < Math.min(rows.length, 30); i++) {
+      const H = (rows[i] || []).map(normTxt);
+      const col = pred => H.findIndex(pred);
+      if (!pilotos && H.includes("IDENTIFICACION")) {
+        const cN = col(h => h.startsWith("NOMBRES")), cC = col(h => h === "IDENTIFICACION"), cP = col(h => h.includes("CERTIFICADO") && h.includes("IDONEIDAD") && !h.startsWith("CUENTA")),
+          cV = col(h => h.startsWith("VIGENCIA")), cS = col(h => h.startsWith("SEDE"));
+        pilotos = rows.slice(i + 1).filter(r => r && r[cC] && r[cN]).map(r => ({ nombre: String(r[cN]).replace(/\s+/g, " ").trim(), cedula: soloDig(r[cC]), cipu: String(r[cP] ?? "").trim(), vigencia: String(r[cV] ?? "").trim(), sede: String(r[cS] ?? "").replace(/\s+/g, " ").trim() }));
+        break;
+      }
+      if (!aeronaves && H.some(h => h.includes("SERIE AERONAVE"))) {
+        const sub = (rows[i + 1] || []).map(normTxt);
+        const cMa = col(h => h === "MARCA"), cMo = col(h => h === "MODELO"), cSe = col(h => h.includes("SERIE AERONAVE")), cMt = col(h => h.startsWith("MATRICULA")), cR = col(h => h.includes("RUAS")), cT = col(h => h.startsWith("TERRITORIAL"));
+        const cPm = sub.findIndex(h => h.startsWith("FECHA PROXIMO MANTENIMIENTO"));
+        aeronaves = rows.slice(i + 2).filter(r => r && r[cSe] && r[cMo] && !normTxt(r[cT]).includes("HURTO")).map(r => {
+          let ruas = String(r[cR] ?? "").trim(); if (/^x*$/i.test(ruas)) ruas = "";
+          return { marca: String(r[cMa] ?? "").trim(), modelo: String(r[cMo]).trim(), serial: String(r[cSe]).trim(), matricula: String(r[cMt] ?? "").trim(), ruas, proxMant6: cPm >= 0 ? fechaISO(r[cPm]) : "" };
+        });
+        break;
+      }
+    }
+  }
+  if (!pilotos && !aeronaves) throw new Error("No se encontraron las hojas de pilotos (columna IDENTIFICACION) ni de aeronaves (columna No SERIE AERONAVE).");
+  const meta = { archivo: file.name, cargado: nowIso() };
+  if (pilotos) lsSet("uas_base_pilotos", { ...meta, pilotos });
+  if (aeronaves) lsSet("uas_base_flota", { ...meta, aeronaves });
+  return { pilotos: pilotos?.length || 0, aeronaves: aeronaves?.length || 0 };
+}
+
 function vNuevo() {
   const L = S.listas.find(x => x.id === S.listaId); const last = lsGet("uas_ult_datos", {});
-  const f = (id, lab, req, ph, val, type = "text") => `<label class="${req ? "req" : ""}" for="${id}"><span>${lab}</span><input id="${id}" type="${type}" ${req ? "required" : ""} placeholder="${esc(ph || "")}" value="${esc(val || "")}" autocomplete="off"></label>`;
+  const naves = flotaDeLista(L); const bp = basePilotos();
+  const opt = (arr, campo, sel) => `<option value="">— Seleccione —</option>` + arr.map((a, i) => `<option value="${i}" ${sel === a.serial ? "selected" : ""}>${esc(a[campo] || "Sin " + campo.toUpperCase())}</option>`).join("");
+  const lastSerial = last[L.id + "_serial"];
   return `<div class="sheet">${header(L)}<div class="acft">${esc(L.meta.aeronave)}</div>
-  <form id="fNuevo"><h1>Datos del vuelo</h1><div class="panel"><div class="form">
-    ${f("piloto", "Piloto al mando", 1, "Nombre completo", last.piloto)}
-    ${f("licencia", "Licencia / certificado", 1, "N.º de licencia", last.licencia)}
-    ${f("serial", "Serial / matrícula de la aeronave", 1, "Serial o matrícula", last[L.id + "_serial"])}
-    ${f("observador", "Observador / auxiliar", 0, "Nombre", last.observador)}
-    ${f("mision", "Misión / caso", 1, "Ej. Búsqueda sector norte")}
-    ${f("lugar", "Lugar", 1, "Municipio, vereda o sitio")}
-    ${f("autorizacion", "Autorización / coordinación ATC", 0, "N.º de permiso o dependencia")}
+  <form id="fNuevo" autocomplete="off"><h1>Datos del vuelo</h1>
+
+  <div class="panel navy"><h2>Identificación del piloto</h2>
+    ${!bp ? `<div class="banner">Este equipo no tiene cargada la base de pilotos. Cárguela desde la pantalla de inicio, o escriba los datos a mano.</div>` : ""}
+    <div class="row" style="align-items:flex-end">
+      <label class="req" for="cedula" style="flex:1 1 220px"><span>Número de cédula del piloto</span><input id="cedula" inputmode="numeric" required placeholder="Ej. 80538499" value="${esc(last.cedula || "")}"></label>
+      <button type="button" class="pri" data-a="buscar-cc">Buscar</button>
+    </div>
+    <div id="pilotoRes"></div>
+  </div>
+
+  <div class="panel"><h2>Aeronave</h2>
+    ${naves.length ? `<div class="form f3">
+      <label class="req" for="selSerial"><span>Serial de la aeronave</span><select id="selSerial" data-campo="serial" required>${opt(naves, "serial", lastSerial)}</select></label>
+      <label class="req" for="selMatricula"><span>Matrícula</span><select id="selMatricula" data-campo="matricula" required>${opt(naves, "matricula", lastSerial)}</select></label>
+      <label for="selRuas"><span>RUAS</span><select id="selRuas" data-campo="ruas">${opt(naves, "ruas", lastSerial)}</select></label>
+    </div><div id="naveAviso"></div>`
+    : `<div class="banner">No hay aeronaves ${esc(L.meta.corto)} en la base de datos de la flota. Escriba los datos a mano.</div>
+      <div class="form f3">
+      <label class="req" for="txtSerial"><span>Serial de la aeronave</span><input id="txtSerial" required></label>
+      <label class="req" for="txtMatricula"><span>Matrícula</span><input id="txtMatricula" required></label>
+      <label for="txtRuas"><span>RUAS</span><input id="txtRuas"></label></div>`}
+  </div>
+
+  <div class="panel"><h2>Vuelo</h2><div class="form">
+    <label class="req" for="orden"><span>No. orden de vuelo</span><input id="orden" required placeholder="Ej. OV-2026-045"></label>
+    <label for="observador"><span>Observador / auxiliar</span><input id="observador" placeholder="Nombre" value="${esc(last.observador || "")}"></label>
+    <label class="req" for="dpto"><span>Departamento</span><select id="dpto" required><option value="">— Seleccione —</option>${Object.keys(S.divipola || {}).map(d => `<option ${last.dpto === d ? "selected" : ""}>${esc(d)}</option>`).join("")}</select></label>
+    <label class="req" for="mpio"><span>Municipio</span><select id="mpio" required><option value="">— Seleccione el departamento —</option></select></label>
+    <label class="req" for="lugar" style="grid-column:1/-1"><span>Lugar (vereda, sector o sitio)</span><input id="lugar" required placeholder="Escriba el lugar exacto del vuelo"></label>
   </div><p class="small muted" style="margin:0">Al pulsar «Comenzar» se registra la hora de inicio y se intenta tomar la ubicación GPS del equipo.</p></div>
   <div class="row"><button type="submit" class="pri">Comenzar lista de chequeo</button><button type="button" data-a="home">Cancelar</button></div></form></div>`;
+}
+function llenarMunicipios(sel) {
+  const d = $("#dpto")?.value, m = $("#mpio"); if (!m) return;
+  const lista = (S.divipola || {})[d] || [];
+  m.innerHTML = `<option value="">${d ? "— Seleccione —" : "— Seleccione el departamento —"}</option>` + lista.map(x => `<option ${x === sel ? "selected" : ""}>${esc(x)}</option>`).join("");
+}
+function mostrarPiloto() {
+  const box = $("#pilotoRes"); if (!box) return;
+  const cc = soloDig($("#cedula").value); const p = buscarPiloto(cc);
+  S.pilotoSel = p || null;
+  if (!cc) { box.innerHTML = ""; return; }
+  if (p) {
+    const vig = normTxt(p.vigencia) === "VIGENTE";
+    box.innerHTML = `<div class="grid-kv" style="margin-top:8px"><div><b>Piloto</b>${esc(p.nombre)}</div><div><b>Certificado CIPU</b>${esc(p.cipu || "—")}</div><div><b>Vigencia CIPU</b><span class="chip ${vig ? "ok" : "nov"}">${esc(p.vigencia || "Sin dato")}</span></div><div style="grid-column:1/-1"><b>Sede</b>${esc(p.sede || "—")}</div></div>
+      ${vig ? "" : `<div class="banner" style="margin-top:8px">El certificado CIPU de este piloto no figura como VIGENTE.</div>`}`;
+  } else {
+    box.innerHTML = `<div class="banner" style="margin-top:8px">${basePilotos() ? "La cédula no está en la base de pilotos." : "Sin base de pilotos en este equipo."} Escriba los datos a mano; el registro quedará marcado como «ingresado manualmente».</div>
+      <div class="form" style="margin-top:8px"><label class="req" for="manNombre"><span>Nombre del piloto</span><input id="manNombre" required></label><label class="req" for="manCipu"><span>Certificado CIPU</span><input id="manCipu" required placeholder="CIPU-100-..."></label></div>`;
+  }
+}
+function syncNave(origen) {
+  const L = S.listas.find(x => x.id === S.listaId); const naves = flotaDeLista(L);
+  const v = origen?.value ?? $("#selSerial")?.value;
+  ["selSerial", "selMatricula", "selRuas"].forEach(id => { const el = $("#" + id); if (el) el.value = v ?? ""; });
+  const a = naves[+v]; const av = $("#naveAviso"); if (!av) return;
+  av.innerHTML = a && a.proxMant6 && a.proxMant6 < hoyISO() ? `<div class="banner" style="margin-top:8px">Atención: el mantenimiento de 6 meses de esta aeronave figura vencido desde ${esc(a.proxMant6)}.</div>` : a && !a.ruas ? `<div class="banner info" style="margin-top:8px">Esta aeronave no tiene registro RUAS en la base de datos.</div>` : "";
+}
+function initNuevo() {
+  const last = lsGet("uas_ult_datos", {});
+  llenarMunicipios(last.mpio); mostrarPiloto(); syncNave();
 }
 
 function filaItem(rec, p, isNext, cerrada) {
@@ -267,7 +382,7 @@ function vRun() {
     <label class="chk" for="decl"><input type="checkbox" id="decl"><span>Declaro que esta lista de chequeo fue ejecutada en campo, ítem por ítem y en el orden establecido, por el piloto <b>${esc(rec.piloto)}</b>.</span></label>
     <div class="row"><button class="pri" data-a="cerrar">Cerrar y firmar registro</button></div></div>` : "";
   return `<div class="sheet">
-    <div class="topbar noprint"><div class="info"><b>${esc(L.meta.corto)} · ${esc(rec.serial)}</b> — ${esc(rec.mision)}<br>${esc(rec.piloto)} · inicio ${fmtT(rec.inicio)} · ${P.done}/${P.total}<div class="bar"><i style="width:${pct}%"></i></div></div>
+    <div class="topbar noprint"><div class="info"><b>${esc(L.meta.corto)} · ${esc(rec.matricula || rec.serial)}</b> — OV ${esc(ordenTxt(rec))}<br>${esc(rec.piloto)} · inicio ${fmtT(rec.inicio)} · ${P.done}/${P.total}<div class="bar"><i style="width:${pct}%"></i></div></div>
       ${P.next ? `<button data-a="ir">Ir al paso actual</button>` : ""}<button data-a="home">Salir</button></div>
     ${header(L, rec.revision)}<div class="acft">${esc(L.meta.aeronave)}</div>
     ${hojaSecciones(rec, true)}
@@ -278,9 +393,11 @@ function vRun() {
 function datosVuelo(rec) {
   return `<div class="grid-kv" style="margin:10px 0">
     <div><b>Registro</b>${esc(rec.id)}</div><div><b>Estado</b>${rec.estado === "cerrada" ? "CERRADA" : "EN CURSO"}</div><div><b>Novedades</b>${nNov(rec)}</div>
-    <div><b>Piloto al mando</b>${esc(rec.piloto)}</div><div><b>Licencia</b>${esc(rec.licencia)}</div><div><b>Observador</b>${esc(rec.observador || "—")}</div>
-    <div><b>Serial / matrícula</b>${esc(rec.serial)}</div><div><b>Misión / caso</b>${esc(rec.mision)}</div><div><b>Lugar</b>${esc(rec.lugar)}</div>
-    <div><b>Autorización ATC</b>${esc(rec.autorizacion || "—")}</div><div><b>Inicio</b>${esc(fmtDT(rec.inicio))}</div><div><b>Cierre</b>${esc(fmtDT(rec.fin))}</div>
+    <div><b>Piloto al mando</b>${esc(rec.piloto)}${rec.pilotoManual ? ` <span class="chip nov">manual</span>` : ""}</div><div><b>Cédula</b>${esc(rec.cedula || "—")}</div><div><b>Certificado CIPU</b>${esc(cipuTxt(rec))}${rec.vigenciaCipu ? ` · ${esc(rec.vigenciaCipu)}` : ""}</div>
+    <div><b>Serial aeronave</b>${esc(rec.serial)}</div><div><b>Matrícula</b>${esc(rec.matricula || "—")}</div><div><b>RUAS</b>${esc(rec.ruas || "—")}</div>
+    <div><b>No. orden de vuelo</b>${esc(ordenTxt(rec))}</div><div><b>Departamento</b>${esc(rec.departamento || "—")}</div><div><b>Municipio</b>${esc(rec.municipio || "—")}</div>
+    <div><b>Lugar</b>${esc(rec.lugar)}</div><div><b>Observador</b>${esc(rec.observador || "—")}</div><div><b>Mantenimiento 6 meses</b>${rec.mantVencido ? `<span class="chip nov">Vencido (${esc(rec.proxMant6)})</span>` : esc(rec.proxMant6 ? "Al día hasta " + rec.proxMant6 : "—")}</div>
+    <div><b>Inicio</b>${esc(fmtDT(rec.inicio))}</div><div><b>Cierre</b>${esc(fmtDT(rec.fin))}</div>
     <div><b>Duración</b>${esc(dur(rec.inicio, rec.fin))}</div><div><b>GPS inicio</b>${esc(gpsTxt(rec.gpsInicio))}</div><div><b>GPS cierre</b>${esc(gpsTxt(rec.gpsCierre))}</div>
     <div><b>Ciclos cambio de batería</b>${nCiclos(rec)}</div><div><b>Correcciones</b>${(rec.bitacora || []).filter(b => b.accion === "corrección").length}</div><div><b>Equipo</b>${esc(rec.equipo || "—")}</div>
   </div>`;
@@ -291,7 +408,7 @@ function bloqueEvidencia(rec) {
     <div class="row" style="align-items:flex-start;gap:16px;margin-top:8px">
       <div style="flex:1 1 260px"><b class="small">Declaración</b><p style="margin:2px 0">${rec.declaracion ? `El piloto <b>${esc(rec.piloto)}</b> declaró que la lista fue ejecutada en campo, ítem por ítem y en el orden establecido.` : "Registro sin cerrar."}</p>
       ${rec.hash ? `<b class="small">Código de verificación</b><div class="hash">${esc(rec.hash)}</div>` : ""}</div>
-      ${rec.firma ? `<div style="flex:0 1 260px"><b class="small">Firma</b><img src="${rec.firma}" alt="Firma del piloto" style="width:100%;max-width:260px;border-bottom:1px solid #000;display:block"><div class="small">${esc(rec.piloto)} · Lic. ${esc(rec.licencia)}</div></div>` : ""}
+      ${rec.firma ? `<div style="flex:0 1 260px"><b class="small">Firma</b><img src="${rec.firma}" alt="Firma del piloto" style="width:100%;max-width:260px;border-bottom:1px solid #000;display:block"><div class="small">${esc(rec.piloto)} · C.C. ${esc(rec.cedula || "—")} · ${esc(cipuTxt(rec))}</div></div>` : ""}
     </div>`;
 }
 
@@ -342,10 +459,10 @@ async function entregar(nombre, contenido, tipo) {
 }
 const csvC = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
 function csvHistorial() {
-  const rows = [["Registro", "Aeronave", "Revisión", "Piloto", "Licencia", "Observador", "Serial", "Misión", "Lugar", "Autorización", "Inicio", "Cierre", "Duración", "Estado", "Novedades", "Ciclos batería", "GPS inicio", "GPS cierre", "Código verificación", "Detalle novedades"]];
+  const rows = [["Registro", "Aeronave", "Revisión", "Piloto", "Cédula", "Certificado CIPU", "Vigencia CIPU", "Observador", "Serial", "Matrícula", "RUAS", "No. orden de vuelo", "Departamento", "Municipio", "Lugar", "Inicio", "Cierre", "Duración", "Estado", "Novedades", "Ciclos batería", "Mantenimiento vencido", "GPS inicio", "GPS cierre", "Código verificación", "Detalle novedades"]];
   for (const r of [...S.recs].sort((a, b) => (a.inicio || "").localeCompare(b.inicio || ""))) {
     const novs = progreso(r).st.filter(p => r.resp[p.key]?.r === "nov").map(p => `${p.sec.id}. ${p.it.n}: ${r.resp[p.key].n}`).join(" | ");
-    rows.push([r.id, r.plantilla.meta.aeronave, r.revision, r.piloto, r.licencia, r.observador, r.serial, r.mision, r.lugar, r.autorizacion, fmtDT(r.inicio), fmtDT(r.fin), dur(r.inicio, r.fin), r.estado, nNov(r), nCiclos(r), gpsTxt(r.gpsInicio), gpsTxt(r.gpsCierre), r.hash || "", novs]);
+    rows.push([r.id, r.plantilla.meta.aeronave, r.revision, r.piloto, r.cedula, cipuTxt(r), r.vigenciaCipu, r.observador, r.serial, r.matricula, r.ruas, ordenTxt(r), r.departamento, r.municipio, r.lugar, fmtDT(r.inicio), fmtDT(r.fin), dur(r.inicio, r.fin), r.estado, nNov(r), nCiclos(r), r.mantVencido ? "SÍ" : "NO", gpsTxt(r.gpsInicio), gpsTxt(r.gpsCierre), r.hash || "", novs]);
   }
   return "﻿" + rows.map(r => r.map(csvC).join(";")).join("\r\n");
 }
@@ -371,6 +488,7 @@ document.addEventListener("click", async ev => {
   else if (a === "continuar") { const r = S.recs.find(x => x.id === id); if (!r) return; S.cur = JSON.parse(JSON.stringify(r)); S.view = "run"; render(); setTimeout(irAlPaso, 60); }
   else if (a === "ver") { S.verId = id; S.view = "ver"; render(); scrollTo(0, 0); }
   else if (a === "ir") irAlPaso();
+  else if (a === "buscar-cc") { mostrarPiloto(); if (!S.pilotoSel && basePilotos()) toast("Cédula no encontrada en la base de pilotos."); }
   else if (a === "res" || a === "dec") responder(b.dataset.k, b.dataset.r);
   else if (a === "nov") { S.noteFor = b.dataset.k; render(); const t = $("#nota"); t?.focus(); }
   else if (a === "nov-no") { S.noteFor = null; render(); irAlPaso(); }
@@ -413,10 +531,18 @@ document.addEventListener("click", async ev => {
 });
 
 document.addEventListener("input", ev => {
+  if (ev.target.id === "cedula") { clearTimeout(S._ccT); S._ccT = setTimeout(mostrarPiloto, 350); }
   if (ev.target.id === "filtro") { S.filtro = ev.target.value; const pos = ev.target.selectionStart; render(); const f = $("#filtro"); f.focus(); f.setSelectionRange(pos, pos); }
 });
 
 document.addEventListener("change", async ev => {
+  const id = ev.target.id;
+  if (id === "dpto") llenarMunicipios();
+  if (id === "selSerial" || id === "selMatricula" || id === "selRuas") syncNave(ev.target);
+  if (id === "xlsBase" && ev.target.files[0]) {
+    try { const n = await importarExcel(ev.target.files[0]); toast(`Base cargada: ${n.pilotos} pilotos y ${n.aeronaves} aeronaves.`, 4000); render(); }
+    catch (e) { toast("No se pudo leer el Excel: " + (e?.message || e), 6000); }
+  }
   if (ev.target.id === "foto" && ev.target.files[0]) {
     try { const data = await comprimirFoto(ev.target.files[0]); (S.cur.fotos ||= []).push({ t: nowIso(), data }); await guardar(S.cur); render(); $("#cierre")?.scrollIntoView(); }
     catch (e) { toast("No se pudo leer la foto."); }
@@ -433,11 +559,19 @@ document.addEventListener("change", async ev => {
 
 document.addEventListener("submit", async ev => {
   if (ev.target.id !== "fNuevo") return; ev.preventDefault();
-  const g = id => $("#" + id).value.trim(); const L = S.listas.find(x => x.id === S.listaId);
-  const ult = lsGet("uas_ult_datos", {}); Object.assign(ult, { piloto: g("piloto"), licencia: g("licencia"), observador: g("observador"), [L.id + "_serial"]: g("serial") }); lsSet("uas_ult_datos", ult);
+  const g = id => ($("#" + id)?.value || "").trim(); const L = S.listas.find(x => x.id === S.listaId);
+  mostrarPiloto();
+  const p = S.pilotoSel;
+  if (!p && (!g("manNombre") || !g("manCipu"))) { toast("Escriba el nombre y el certificado CIPU del piloto."); $("#manNombre")?.focus(); return; }
+  let nave;
+  if ($("#selSerial")) { nave = flotaDeLista(L)[+g("selSerial")]; if (!nave) { toast("Seleccione la aeronave."); $("#selSerial").focus(); return; } }
+  else nave = { serial: g("txtSerial"), matricula: g("txtMatricula"), ruas: g("txtRuas"), manual: true };
+  const ult = lsGet("uas_ult_datos", {}); Object.assign(ult, { cedula: soloDig(g("cedula")), observador: g("observador"), [L.id + "_serial"]: nave.serial, dpto: g("dpto"), mpio: g("mpio") }); lsSet("uas_ult_datos", ult);
   const rec = {
     id: newId(), appVersion: APP_VERSION, lista: L.id, revision: L.meta.revision || "", plantilla: JSON.parse(JSON.stringify(L)),
-    piloto: g("piloto"), licencia: g("licencia"), serial: g("serial"), observador: g("observador"), mision: g("mision"), lugar: g("lugar"), autorizacion: g("autorizacion"),
+    piloto: p ? p.nombre : g("manNombre"), cedula: soloDig(g("cedula")), cipu: p ? p.cipu : g("manCipu"), vigenciaCipu: p ? p.vigencia : "", sedePiloto: p ? p.sede : "", pilotoManual: !p,
+    serial: nave.serial, matricula: nave.matricula, ruas: nave.ruas || "", aeronaveManual: !!nave.manual, mantVencido: !!(nave.proxMant6 && nave.proxMant6 < hoyISO()), proxMant6: nave.proxMant6 || "",
+    observador: g("observador"), ordenVuelo: g("orden"), departamento: g("dpto"), municipio: g("mpio"), lugar: g("lugar"),
     equipo: (navigator.userAgent.match(/\(([^)]+)\)/)?.[1] || "").slice(0, 60),
     inicio: nowIso(), fin: null, estado: "en_curso", resp: {}, fotos: [], bitacora: []
   };
@@ -455,6 +589,8 @@ window.addEventListener("offline", () => S.view === "home" && render());
   try { await IDB.open(); S.recs = await IDB.all() || []; }
   catch (e) { S.errores.push("Este navegador no permite guardar datos (¿modo privado?). Los registros no se conservarán."); }
   const { out, errores } = await cargarListas(); S.listas = out; S.errores.push(...errores);
+  try { S.divipola = await (await fetch("datos/divipola.json")).json(); } catch (e) { S.errores.push("No se pudo cargar la lista de departamentos y municipios."); }
+  try { S.flotaWeb = await (await fetch("datos/flota.json", { cache: "no-cache" })).json(); } catch (e) { /* se usa la del Excel si existe */ }
   render();
   if ("serviceWorker" in navigator && location.protocol !== "file:") {
     try {

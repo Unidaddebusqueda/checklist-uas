@@ -10,6 +10,7 @@
 # ============================================================
 aeronave: DJI MATRICE-400-LIDAR ZENMUSE-L2
 corto: M400 + L2
+modelos: MATRICE-400, MATRICE 400
 tipo: NORMAL CHECK LIST
 fabricante: DJI
 logo: img/logo-dji.png

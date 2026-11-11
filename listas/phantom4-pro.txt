@@ -1,6 +1,7 @@
 # LISTA DE CHEQUEO - DJI PHANTOM 4 PRO   (formato: ver LEEME.md)
 aeronave: DJI PHANTOM 4 PRO
 corto: Phantom 4 Pro
+modelos: PHANTOM 4, PHANTOM 4 PRO
 tipo: NORMAL CHECK LIST
 fabricante: DJI
 logo: img/logo-dji.png

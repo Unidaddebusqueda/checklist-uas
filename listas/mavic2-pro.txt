@@ -1,6 +1,7 @@
 # LISTA DE CHEQUEO - DJI MAVIC 2 PRO   (formato: ver LEEME.md)
 aeronave: DJI MAVIC 2 PRO
 corto: Mavic 2 Pro
+modelos: MAVIC 2 PRO
 tipo: NORMAL CHECK LIST
 fabricante: DJI
 logo: img/logo-dji.png
