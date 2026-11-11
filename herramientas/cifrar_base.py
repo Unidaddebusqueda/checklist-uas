@@ -52,8 +52,8 @@ def main():
         raise SystemExit(__doc__)
     pilotos = leer_pilotos(sys.argv[1])
     clave = os.environ.get("CLAVE_BASE") or getpass.getpass("Clave de la unidad: ")
-    if len(clave) < 10:
-        raise SystemExit("La clave debe tener al menos 10 caracteres.")
+    if len(clave) < 8:
+        raise SystemExit("La clave debe tener al menos 8 caracteres.")
     sal, iv = os.urandom(16), os.urandom(12)
     k = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=sal, iterations=ITER).derive(clave.encode("utf-8"))
     datos = json.dumps({"pilotos": pilotos}, ensure_ascii=False).encode("utf-8")
