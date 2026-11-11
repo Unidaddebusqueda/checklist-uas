@@ -275,7 +275,7 @@ function vNuevo() {
   <div class="panel navy"><h2>Identificación del piloto</h2>
     ${!bp ? `<div class="banner">Este equipo no tiene cargada la base de pilotos. Cárguela desde la pantalla de inicio, o escriba los datos a mano.</div>` : ""}
     <div class="row" style="align-items:flex-end">
-      <label class="req" for="cedula" style="flex:1 1 220px"><span>Número de cédula del piloto</span><input id="cedula" inputmode="numeric" required placeholder="Ej. 80538499" value="${esc(last.cedula || "")}"></label>
+      <label class="req" for="cedula" style="flex:1 1 220px"><span>Número de cédula del piloto</span><input id="cedula" inputmode="numeric" required placeholder="Solo números" value="${esc(last.cedula || "")}"></label>
       <button type="button" class="pri" data-a="buscar-cc">Buscar</button>
     </div>
     <div id="pilotoRes"></div>
