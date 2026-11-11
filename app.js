@@ -3,7 +3,7 @@
    Los registros se guardan en el dispositivo (IndexedDB) y se exportan como evidencia. */
 "use strict";
 
-const APP_VERSION = "1.2.0";
+const APP_VERSION = "1.3.0";
 const MAX_CICLOS = 8;
 const MAX_FOTOS = 4;
 const ENTIDAD = { nombre: "Unidad de Búsqueda de Personas Dadas por Desaparecidas", sigla: "UBPD", logo: "img/logo-ubpd.png" };
@@ -284,13 +284,21 @@ function vNuevo() {
   return `<div class="sheet">${header(L)}<div class="acft">${esc(L.meta.aeronave)}</div>
   <form id="fNuevo" autocomplete="off"><h1>Datos del vuelo</h1>
 
-  <div class="panel navy"><h2>Identificación del piloto</h2>
-    ${!bp ? `<div class="banner">Este equipo no tiene cargada la base de pilotos. Cárguela desde la pantalla de inicio, o escriba los datos a mano.</div>` : ""}
+  <div class="panel navy"><h2>Identificación del piloto al mando (Piloto No. 1)</h2>
+    ${!bp ? `<div class="banner">Este equipo no tiene cargada la base de pilotos. Actívela desde la pantalla de inicio, o escriba los datos a mano.</div>` : ""}
     <div class="row" style="align-items:flex-end">
-      <label class="req" for="cedula" style="flex:1 1 220px"><span>Número de cédula del piloto</span><input id="cedula" inputmode="numeric" required placeholder="Solo números" value="${esc(last.cedula || "")}"></label>
-      <button type="button" class="pri" data-a="buscar-cc">Buscar</button>
+      <label class="req" for="cedula" style="flex:1 1 220px"><span>Número de cédula del Piloto No. 1</span><input id="cedula" inputmode="numeric" required placeholder="Solo números" value="${esc(last.cedula || "")}"></label>
+      <button type="button" class="pri" data-a="buscar-cc" data-sfx="">Buscar</button>
     </div>
     <div id="pilotoRes"></div>
+  </div>
+
+  <div class="panel"><h2>Piloto No. 2</h2>
+    <div class="row" style="align-items:flex-end">
+      <label for="cedula2" style="flex:1 1 220px"><span>Número de cédula del Piloto No. 2 (si aplica)</span><input id="cedula2" inputmode="numeric" placeholder="Solo números" value="${esc(last.cedula2 || "")}"></label>
+      <button type="button" class="pri" data-a="buscar-cc" data-sfx="2">Buscar</button>
+    </div>
+    <div id="pilotoRes2"></div>
   </div>
 
   <div class="panel"><h2>Aeronave</h2>
@@ -308,9 +316,9 @@ function vNuevo() {
 
   <div class="panel"><h2>Vuelo</h2><div class="form">
     <label class="req" for="orden"><span>No. orden de vuelo</span><input id="orden" required placeholder="Ej. OV-2026-045"></label>
-    <label for="observador"><span>Observador / auxiliar</span><input id="observador" placeholder="Nombre" value="${esc(last.observador || "")}"></label>
     <label class="req" for="dpto"><span>Departamento</span><select id="dpto" required><option value="">— Seleccione —</option>${Object.keys(S.divipola || {}).map(d => `<option ${last.dpto === d ? "selected" : ""}>${esc(d)}</option>`).join("")}</select></label>
     <label class="req" for="mpio"><span>Municipio</span><select id="mpio" required><option value="">— Seleccione el departamento —</option></select></label>
+    <span></span>
     <label class="req" for="lugar" style="grid-column:1/-1"><span>Lugar (vereda, sector o sitio)</span><input id="lugar" required placeholder="Escriba el lugar exacto del vuelo"></label>
   </div><p class="small muted" style="margin:0">Al pulsar «Comenzar» se registra la hora de inicio y se intenta tomar la ubicación GPS del equipo.</p></div>
   <div class="row"><button type="submit" class="pri">Comenzar lista de chequeo</button><button type="button" data-a="home">Cancelar</button></div></form></div>`;
@@ -320,18 +328,19 @@ function llenarMunicipios(sel) {
   const lista = (S.divipola || {})[d] || [];
   m.innerHTML = `<option value="">${d ? "— Seleccione —" : "— Seleccione el departamento —"}</option>` + lista.map(x => `<option ${x === sel ? "selected" : ""}>${esc(x)}</option>`).join("");
 }
-function mostrarPiloto() {
-  const box = $("#pilotoRes"); if (!box) return;
-  const cc = soloDig($("#cedula").value); const p = buscarPiloto(cc);
-  S.pilotoSel = p || null;
+function mostrarPiloto(sfx = "") {
+  const box = $("#pilotoRes" + sfx); if (!box) return;
+  const cc = soloDig($("#cedula" + sfx).value); const p = buscarPiloto(cc);
+  S["pilotoSel" + sfx] = p || null;
   if (!cc) { box.innerHTML = ""; return; }
+  if (sfx && cc === soloDig($("#cedula").value)) { box.innerHTML = `<div class="banner" style="margin-top:8px">El Piloto No. 2 no puede ser el mismo Piloto No. 1.</div>`; S.pilotoSel2 = null; return; }
   if (p) {
     const vig = normTxt(p.vigencia) === "VIGENTE";
-    box.innerHTML = `<div class="grid-kv" style="margin-top:8px"><div><b>Piloto</b>${esc(p.nombre)}</div><div><b>Certificado CIPU</b>${esc(p.cipu || "—")}</div><div><b>Vigencia CIPU</b><span class="chip ${vig ? "ok" : "nov"}">${esc(p.vigencia || "Sin dato")}</span></div><div style="grid-column:1/-1"><b>Sede</b>${esc(p.sede || "—")}</div></div>
+    box.innerHTML = `<div class="grid-kv" style="margin-top:8px"><div><b>Piloto No. ${sfx || 1}</b>${esc(p.nombre)}</div><div><b>Certificado CIPU</b>${esc(p.cipu || "—")}</div><div><b>Vigencia CIPU</b><span class="chip ${vig ? "ok" : "nov"}">${esc(p.vigencia || "Sin dato")}</span></div><div style="grid-column:1/-1"><b>Sede</b>${esc(p.sede || "—")}</div></div>
       ${vig ? "" : `<div class="banner" style="margin-top:8px">El certificado CIPU de este piloto no figura como VIGENTE.</div>`}`;
   } else {
     box.innerHTML = `<div class="banner" style="margin-top:8px">${basePilotos() ? "La cédula no está en la base de pilotos." : "Sin base de pilotos en este equipo."} Escriba los datos a mano; el registro quedará marcado como «ingresado manualmente».</div>
-      <div class="form" style="margin-top:8px"><label class="req" for="manNombre"><span>Nombre del piloto</span><input id="manNombre" required></label><label class="req" for="manCipu"><span>Certificado CIPU</span><input id="manCipu" required placeholder="CIPU-100-..."></label></div>`;
+      <div class="form" style="margin-top:8px"><label class="req" for="manNombre${sfx}"><span>Nombre del Piloto No. ${sfx || 1}</span><input id="manNombre${sfx}" required></label><label class="req" for="manCipu${sfx}"><span>Certificado CIPU</span><input id="manCipu${sfx}" required placeholder="CIPU-100-..."></label></div>`;
   }
 }
 function syncNave(origen) {
@@ -343,7 +352,7 @@ function syncNave(origen) {
 }
 function initNuevo() {
   const last = lsGet("uas_ult_datos", {});
-  llenarMunicipios(last.mpio); mostrarPiloto(); syncNave();
+  llenarMunicipios(last.mpio); mostrarPiloto(); mostrarPiloto("2"); syncNave();
 }
 
 function filaItem(rec, p, isNext, cerrada) {
@@ -408,7 +417,7 @@ function datosVuelo(rec) {
     <div><b>Piloto al mando</b>${esc(rec.piloto)}${rec.pilotoManual ? ` <span class="chip nov">manual</span>` : ""}</div><div><b>Cédula</b>${esc(rec.cedula || "—")}</div><div><b>Certificado CIPU</b>${esc(cipuTxt(rec))}${rec.vigenciaCipu ? ` · ${esc(rec.vigenciaCipu)}` : ""}</div>
     <div><b>Serial aeronave</b>${esc(rec.serial)}</div><div><b>Matrícula</b>${esc(rec.matricula || "—")}</div><div><b>RUAS</b>${esc(rec.ruas || "—")}</div>
     <div><b>No. orden de vuelo</b>${esc(ordenTxt(rec))}</div><div><b>Departamento</b>${esc(rec.departamento || "—")}</div><div><b>Municipio</b>${esc(rec.municipio || "—")}</div>
-    <div><b>Lugar</b>${esc(rec.lugar)}</div><div><b>Observador</b>${esc(rec.observador || "—")}</div><div><b>Mantenimiento 6 meses</b>${rec.mantVencido ? `<span class="chip nov">Vencido (${esc(rec.proxMant6)})</span>` : esc(rec.proxMant6 ? "Al día hasta " + rec.proxMant6 : "—")}</div>
+    <div><b>Lugar</b>${esc(rec.lugar)}</div><div><b>Piloto No. 2</b>${rec.piloto2 ? `${esc(rec.piloto2.nombre)}${rec.piloto2.manual ? ` <span class="chip nov">manual</span>` : ""}<div class="small">C.C. ${esc(rec.piloto2.cedula)} · ${esc(rec.piloto2.cipu)}${rec.piloto2.vigencia ? " · " + esc(rec.piloto2.vigencia) : ""}</div>` : esc(rec.observador || "—")}</div><div><b>Mantenimiento 6 meses</b>${rec.mantVencido ? `<span class="chip nov">Vencido (${esc(rec.proxMant6)})</span>` : esc(rec.proxMant6 ? "Al día hasta " + rec.proxMant6 : "—")}</div>
     <div><b>Inicio</b>${esc(fmtDT(rec.inicio))}</div><div><b>Cierre</b>${esc(fmtDT(rec.fin))}</div>
     <div><b>Duración</b>${esc(dur(rec.inicio, rec.fin))}</div><div><b>GPS inicio</b>${esc(gpsTxt(rec.gpsInicio))}</div><div><b>GPS cierre</b>${esc(gpsTxt(rec.gpsCierre))}</div>
     <div><b>Ciclos cambio de batería</b>${nCiclos(rec)}</div><div><b>Correcciones</b>${(rec.bitacora || []).filter(b => b.accion === "corrección").length}</div><div><b>Equipo</b>${esc(rec.equipo || "—")}</div>
@@ -471,10 +480,10 @@ async function entregar(nombre, contenido, tipo) {
 }
 const csvC = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
 function csvHistorial() {
-  const rows = [["Registro", "Aeronave", "Revisión", "Piloto", "Cédula", "Certificado CIPU", "Vigencia CIPU", "Observador", "Serial", "Matrícula", "RUAS", "No. orden de vuelo", "Departamento", "Municipio", "Lugar", "Inicio", "Cierre", "Duración", "Estado", "Novedades", "Ciclos batería", "Mantenimiento vencido", "GPS inicio", "GPS cierre", "Código verificación", "Detalle novedades"]];
+  const rows = [["Registro", "Aeronave", "Revisión", "Piloto", "Cédula", "Certificado CIPU", "Vigencia CIPU", "Piloto No. 2", "Cédula Piloto No. 2", "CIPU Piloto No. 2", "Serial", "Matrícula", "RUAS", "No. orden de vuelo", "Departamento", "Municipio", "Lugar", "Inicio", "Cierre", "Duración", "Estado", "Novedades", "Ciclos batería", "Mantenimiento vencido", "GPS inicio", "GPS cierre", "Código verificación", "Detalle novedades"]];
   for (const r of [...S.recs].sort((a, b) => (a.inicio || "").localeCompare(b.inicio || ""))) {
     const novs = progreso(r).st.filter(p => r.resp[p.key]?.r === "nov").map(p => `${p.sec.id}. ${p.it.n}: ${r.resp[p.key].n}`).join(" | ");
-    rows.push([r.id, r.plantilla.meta.aeronave, r.revision, r.piloto, r.cedula, cipuTxt(r), r.vigenciaCipu, r.observador, r.serial, r.matricula, r.ruas, ordenTxt(r), r.departamento, r.municipio, r.lugar, fmtDT(r.inicio), fmtDT(r.fin), dur(r.inicio, r.fin), r.estado, nNov(r), nCiclos(r), r.mantVencido ? "SÍ" : "NO", gpsTxt(r.gpsInicio), gpsTxt(r.gpsCierre), r.hash || "", novs]);
+    rows.push([r.id, r.plantilla.meta.aeronave, r.revision, r.piloto, r.cedula, cipuTxt(r), r.vigenciaCipu, r.piloto2?.nombre || r.observador || "", r.piloto2?.cedula || "", r.piloto2?.cipu || "", r.serial, r.matricula, r.ruas, ordenTxt(r), r.departamento, r.municipio, r.lugar, fmtDT(r.inicio), fmtDT(r.fin), dur(r.inicio, r.fin), r.estado, nNov(r), nCiclos(r), r.mantVencido ? "SÍ" : "NO", gpsTxt(r.gpsInicio), gpsTxt(r.gpsCierre), r.hash || "", novs]);
   }
   return "﻿" + rows.map(r => r.map(csvC).join(";")).join("\r\n");
 }
@@ -506,7 +515,7 @@ document.addEventListener("click", async ev => {
     try { const n = await desbloquearBase(clave); toast(`Base activada: ${n} pilotos.`, 3500); render(); }
     catch (e) { b.disabled = false; b.textContent = "Activar base"; toast("Clave incorrecta. Verifique e intente de nuevo.", 4000); $("#claveBase").select(); }
   }
-  else if (a === "buscar-cc") { mostrarPiloto(); if (!S.pilotoSel && basePilotos()) toast("Cédula no encontrada en la base de pilotos."); }
+  else if (a === "buscar-cc") { const sfx = b.dataset.sfx || ""; mostrarPiloto(sfx); if (!S["pilotoSel" + sfx] && basePilotos() && soloDig($("#cedula" + sfx).value)) toast("Cédula no encontrada en la base de pilotos."); }
   else if (a === "res" || a === "dec") responder(b.dataset.k, b.dataset.r);
   else if (a === "nov") { S.noteFor = b.dataset.k; render(); const t = $("#nota"); t?.focus(); }
   else if (a === "nov-no") { S.noteFor = null; render(); irAlPaso(); }
@@ -549,7 +558,7 @@ document.addEventListener("click", async ev => {
 });
 
 document.addEventListener("input", ev => {
-  if (ev.target.id === "cedula") { clearTimeout(S._ccT); S._ccT = setTimeout(mostrarPiloto, 350); }
+  if (ev.target.id === "cedula" || ev.target.id === "cedula2") { const sfx = ev.target.id === "cedula2" ? "2" : ""; clearTimeout(S["_ccT" + sfx]); S["_ccT" + sfx] = setTimeout(() => mostrarPiloto(sfx), 350); }
   if (ev.target.id === "filtro") { S.filtro = ev.target.value; const pos = ev.target.selectionStart; render(); const f = $("#filtro"); f.focus(); f.setSelectionRange(pos, pos); }
 });
 
@@ -578,18 +587,21 @@ document.addEventListener("change", async ev => {
 document.addEventListener("submit", async ev => {
   if (ev.target.id !== "fNuevo") return; ev.preventDefault();
   const g = id => ($("#" + id)?.value || "").trim(); const L = S.listas.find(x => x.id === S.listaId);
-  mostrarPiloto();
-  const p = S.pilotoSel;
-  if (!p && (!g("manNombre") || !g("manCipu"))) { toast("Escriba el nombre y el certificado CIPU del piloto."); $("#manNombre")?.focus(); return; }
+  mostrarPiloto(); mostrarPiloto("2");
+  const p = S.pilotoSel, p2 = S.pilotoSel2, cc2 = soloDig(g("cedula2"));
+  if (!p && (!g("manNombre") || !g("manCipu"))) { toast("Escriba el nombre y el certificado CIPU del Piloto No. 1."); $("#manNombre")?.focus(); return; }
+  if (cc2 && cc2 === soloDig(g("cedula"))) { toast("El Piloto No. 2 no puede ser el mismo Piloto No. 1."); $("#cedula2").focus(); return; }
+  if (cc2 && !p2 && (!g("manNombre2") || !g("manCipu2"))) { toast("Escriba el nombre y el certificado CIPU del Piloto No. 2."); $("#manNombre2")?.focus(); return; }
+  const piloto2 = cc2 ? { nombre: p2 ? p2.nombre : g("manNombre2"), cedula: cc2, cipu: p2 ? p2.cipu : g("manCipu2"), vigencia: p2 ? p2.vigencia : "", sede: p2 ? p2.sede : "", manual: !p2 } : null;
   let nave;
   if ($("#selSerial")) { nave = flotaDeLista(L)[+g("selSerial")]; if (!nave) { toast("Seleccione la aeronave."); $("#selSerial").focus(); return; } }
   else nave = { serial: g("txtSerial"), matricula: g("txtMatricula"), ruas: g("txtRuas"), manual: true };
-  const ult = lsGet("uas_ult_datos", {}); Object.assign(ult, { cedula: soloDig(g("cedula")), observador: g("observador"), [L.id + "_serial"]: nave.serial, dpto: g("dpto"), mpio: g("mpio") }); lsSet("uas_ult_datos", ult);
+  const ult = lsGet("uas_ult_datos", {}); Object.assign(ult, { cedula: soloDig(g("cedula")), cedula2: cc2, [L.id + "_serial"]: nave.serial, dpto: g("dpto"), mpio: g("mpio") }); lsSet("uas_ult_datos", ult);
   const rec = {
     id: newId(), appVersion: APP_VERSION, lista: L.id, revision: L.meta.revision || "", plantilla: JSON.parse(JSON.stringify(L)),
     piloto: p ? p.nombre : g("manNombre"), cedula: soloDig(g("cedula")), cipu: p ? p.cipu : g("manCipu"), vigenciaCipu: p ? p.vigencia : "", sedePiloto: p ? p.sede : "", pilotoManual: !p,
     serial: nave.serial, matricula: nave.matricula, ruas: nave.ruas || "", aeronaveManual: !!nave.manual, mantVencido: !!(nave.proxMant6 && nave.proxMant6 < hoyISO()), proxMant6: nave.proxMant6 || "",
-    observador: g("observador"), ordenVuelo: g("orden"), departamento: g("dpto"), municipio: g("mpio"), lugar: g("lugar"),
+    piloto2, ordenVuelo: g("orden"), departamento: g("dpto"), municipio: g("mpio"), lugar: g("lugar"),
     equipo: (navigator.userAgent.match(/\(([^)]+)\)/)?.[1] || "").slice(0, 60),
     inicio: nowIso(), fin: null, estado: "en_curso", resp: {}, fotos: [], bitacora: []
   };
