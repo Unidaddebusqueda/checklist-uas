@@ -1,0 +1,143 @@
+# ============================================================
+# LISTA DE CHEQUEO - DJI MATRICE 400 + LIDAR ZENMUSE L2
+# Formato (ver LEEME.md):
+#   clave: valor                -> datos de la lista (antes de la primera sección)
+#   == N | TÍTULO | opciones    -> nueva sección (opciones: rojo, repetible)
+#   Ítem | Valor esperado       -> un ítem
+#   !Ítem | Valor               -> ítem resaltado en rojo
+#   *Ítem | Valor               -> ítem en negrilla
+#   Las líneas que empiezan con # se ignoran.
+# ============================================================
+aeronave: DJI MATRICE-400-LIDAR ZENMUSE-L2
+corto: M400 + L2
+tipo: NORMAL CHECK LIST
+fabricante: DJI
+logo: img/logo-dji.png
+revision: REV. 1.1 ENE-2026
+elaboro: ING. Manuel Farid Medina
+
+== 1 | INSPECCIÓN INICIAL
+!Estuche De Transporte | Requerido/Abierto
+Brazos (Tren Aterrizaje) | Puestos/Asegurados
+!Aeronave (Retirada Estuche) | Extraída/Inspección
+Brazos Delanteros | Desplegados
+Brazos Traseros | Desplegados
+Motores | Libres/Movimiento
+Seguros Brazos Delanteros/Traseros | Bloqueados
+Hélices | Puestas/Desplegadas
+Protector Gimbal LiDAR Giratorio | Removido/Libre
+Protector Puerto Interno Baterías | Removido/Libre
+Test De Batería TB100 Aeronave | >75%/Puesta
+!LiDAR Zenmuse L2 | Requerido/Inspección
+Funda Protección Delantera | Removida/Libre
+Tapa Conector Gimbal | Removida/Libre
+Tapa Conector Gimbal Aeronave | Removida/Libre
+Puntos Rojos Alineación | Alineados/Asegurado
+!Control RC Plus | Requerido/Inspección
+Antenas | Desplegadas
+Pantalla Táctil RC | Buen Estado/Check
+Nivel De Baterías RC | >75% Verificada
+Palancas De Control RC | Puestas/Centradas
+Máster Botón De Encendido | Pulsado/Encendido
+Aplicación DJI Pilot 2 | Iniciado/En línea
+Modo De Vuelo | Normal/Sport/Función
+Indicadores LED RC | Normal/Verde
+Encendido Batería Aeronave | Pulsar/2 Seg
+Test De Encendido Aeronave | Completo
+Indicador Estado Aeronave LED Traseros | Normal/Verdes
+
+== 2 | ANTES DE ROTACIÓN DE HÉLICES
+Revisión Área Exterior | Completada
+Dron Puerto Asegurado | Confirmado
+Enlace DJI Pilot 2 | En línea
+RTH Y Punto Origen | Ajustado/Actualizado
+Altitud Regreso | Ajustado/Verificado
+Altura Máxima | 120 M/Ajustado
+Distancia Máxima De Vuelo | 750 M/Ajustado
+Sistema Anticolisión | Armado/Ajustado
+Indicador LED Delanteros | Normal/Rojo-Verde
+Indicador LED Traseros | Normal/Verde
+Señal GPS | >12/Actualizado
+Modo Palanca De Control | Modo 2
+Estado Sensores IMU, Brújula | Normal
+Vuelo Automático | Cargado/Ajustado
+
+== 3 | ROTACIÓN DE HÉLICES | rojo
+Toma De Tiempo | Chequeado
+Área De Vuelo | Libre/Despejada
+*Dron Puerto | Instalado/Asegurado
+Libre Motores 1, 2, 3, 4 | Libre/Confirmado
+Hélices Rotando | Confirmado
+Vuelo Estacionario | 2 Metros/Ajustado
+Modo De Vuelo | Normal/Ajustado
+Chequeo Controles De Vuelo | Normal/Verificado
+% De Batería Aeronave | >75% Confirmado
+% De Batería Control RC | >75%/Confirmado
+
+== 4 | DESPEGUE | rojo
+Comunicación ATC Requeridas | Establecida
+Autorización Despegue | Recibida
+Ascenso | Ajustado
+Indicaciones (GPS, Señal RC, % Baterías, Altitud, Distancia) | Chequeo/Cruzado
+Cargar Misión | Ejecutar/Chequeado
+
+== 5 | CUMPLIMIENTO MISIÓN | rojo
+Vuelo Automático Programado | Requerido/Ajustado
+Vuelo Manual | Requerido/SÍ. NO
+Grilla/Polígono De Vuelo | Iniciado
+Parámetros (GPS, Señal RC, % Baterías, Altitud, Distancia) | Chequeo/Cruzado
+Vuelo Terminado | RTH/ON
+Regreso Modo Manual | Requerido/SÍ. NO
+
+== 6 | DESCENSO | rojo
+Comunicaciones | Establecidas
+RTH | Iniciado/Armado
+Baterías Dron/RC | >30% Verificada
+Indicación Velocidad | Mantener
+Obstáculos Físicos | Libre
+Distancia Punto Origen | Chequeada
+Altura A 20 Metros | RTH/Cancelado
+Vuelo Manual | Iniciado
+Call Outs De Alturas 20, 15, 10, 5, Mínimos | Aterrizado
+
+== 7 | TRÁNSITO CAMBIO DE BATERÍA | repetible
+Batería Dron | Reemplazada
+Área De Vuelo | Libre/Despejada
+Encendido Dron | Confirmado
+DJI Pilot 2 | En línea
+Inicio Motores | Rotación/Confirmada
+Hélices | Girando/Confirmado
+Vuelo Estacionario | 1 Metro/Ajustado
+% De Batería Dron | >75% Confirmado
+% De Batería Control RC | >30%/Confirmado
+Continuar Misión | Confirmados
+!Lista Chequeo En Despegue | Seguir
+
+== 8 | PARADA DE MOTORES
+Comunicaciones | Establecida
+Información Guardada | Confirmada
+Motores | Apagados
+Hélices | Detenidas
+Batería Dron | Apagada
+Confirmación Datos Guardados | Chequeado
+Control RC | Apagado
+Toma Tiempo | Chequeado
+
+== 9 | POST-VUELO
+Hélices | Plegadas/Aseguradas
+Protector LiDAR Giratorio | Instalado
+Sensor LiDAR | Retirado
+Funda Protección Delantera | Instalada
+Tapa Conector Gimbal | Instalada
+Tapa Conector Gimbal Aeronave | Instalada
+Brazos (Tren De Aterrizaje) | Removidos
+Estado Aeronave | Normal/Estado
+Estado Control RC | Guardado/Estado
+
+== 10 | POST-BRIEFING
+Cumplimiento De La Misión | Cumplida/SÍ. NO
+Calidad Datos Obtenidos | Requerido
+Novedad Operacional | Ninguna/SÍ. NO
+Dron Puerto | Removido
+Registro De Vuelo | Actualizado
+Post-Briefing | Completo

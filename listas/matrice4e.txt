@@ -1,0 +1,129 @@
+# LISTA DE CHEQUEO - DJI MATRICE 4E   (formato: ver LEEME.md)
+aeronave: DJI MATRICE 4E
+corto: Matrice 4E
+tipo: NORMAL CHECK LIST
+fabricante: DJI
+logo: img/logo-dji.png
+revision: REV. 1.1 ENE-2026
+elaboro: ING. Manuel Farid Medina
+
+== 1 | INSPECCIÓN INICIAL
+!Control DJI RC Plus 2 Enterprise | Requerido/Inspección
+Antenas | Desplegadas
+Pantalla Táctil RC | Buen Estado/Check
+Nivel De Batería RC | >75% Verificada
+Palancas De Control RC | Puestas/Centradas
+Botón Encendido RC | Pulsar/Encendido
+Aplicación DJI Pilot 2 | Iniciado/En línea
+Modo De Vuelo | Normal/Ajustado
+!Aeronave Matrice 4E | Requerida
+Brazos Delanteros | Desplegados
+Brazos Traseros | Desplegados
+Motores | Libres/Movimiento
+Hélices 1157F | Puestas/Aseguradas
+Protector Gimbal | Removido
+Cámaras Y Telémetro Láser | Limpios/Sin daño
+Sensores Visión E Infrarrojo | Limpios/Libres
+Batería De Vuelo 6741 mAh | >75% y Puesta
+Módulo RTK | Montado/N/A
+Accesorios AL1 / AS1 | Montados/N/A
+Memoria microSD V30 | Insertada/Reseteada
+Encendido Aeronave | Pulsar/Mantener
+Luces De Estado | Normal/Encendidas
+
+== 2 | ANTES DE ROTACIÓN DE HÉLICES
+Revisión Área Exterior | Completada
+Dron Puerto Asegurado | Confirmado
+Enlace DJI Pilot 2 (O4) | En línea
+RTH Y Punto Origen | Ajustado/Actualizado
+Altitud Regreso | Ajustado/Verificado
+Altura Máxima | 120 M/Ajustado
+Distancia Máxima De Vuelo | 750 M/Ajustado
+Sistema Anticolisión | Armado/Ajustado
+Viento En Superficie | <12 m/s Verificado
+Indicador LED Delanteros | Normal
+Indicador LED Traseros | Normal
+Señal GPS | >12/Actualizado
+Modo Palanca De Control | Modo 2
+Estado Sensores IMU, Brújula | Normal
+Vuelo Automático | Cargado/Ajustado
+
+== 3 | ROTACIÓN DE HÉLICES | rojo
+Toma De Tiempo Inicio | Chequeado
+Área De Vuelo | Libre/Despejada
+Dron Puerto | Instalado/Asegurado
+Inicio Motores | Rotación/Confirmada
+Hélices | Girando/Confirmado
+Vuelo Estacionario | 1 Metro/Ajustado
+Controles De Vuelo | Modo 2/Normal
+% De Batería Dron | >75% Confirmado
+% De Batería Control RC | >75%/Confirmado
+
+== 4 | DESPEGUE | rojo
+Comunicaciones Requeridas | Establecida
+Autorización Despegue | Recibida
+Ascenso | Ajustado
+Indicaciones GPS/RC/Batería/Alt. | Chequeo/Cruzado
+Potencia Motores | Ajustado
+Misión | Ejecutar/Chequeado
+
+== 5 | CUMPLIMIENTO MISIÓN | rojo
+Vuelo Automático Programado | Requerido/Ajustado
+Vuelo Manual | Requerido/SÍ. NO
+Grilla/Polígono De Vuelo | Iniciado
+Telémetro Láser (RNG) | Según misión
+Parámetros GPS/RC/Batería/Alt. | Chequeo/Cruzado
+Vuelo Terminado | RTH/ON
+Regreso Modo Manual | Requerido/SÍ. NO
+
+== 6 | DESCENSO | rojo
+Comunicaciones | Establecidas
+RTH | Iniciado/Armado
+Baterías Dron/RC | >30% Verificada
+Indicación Velocidad | Mantener
+Obstáculos Físicos | Libre
+Distancia Punto Origen | Chequeada
+Altura A 20 Metros | RTH/Cancelado
+Vuelo Manual | Iniciado
+Call Outs Alturas 20, 15, 10, 5 | Aterrizado
+
+== 7 | TRÁNSITO CAMBIO DE BATERÍA | repetible
+Batería Dron | Reemplazada
+Área De Vuelo | Libre/Despejada
+Encendido Dron | Confirmado
+DJI Pilot 2 | En línea
+Inicio Motores | Rotación/Confirmada
+Hélices | Girando/Confirmado
+Vuelo Estacionario | 1 Metro/Ajustado
+% De Batería Dron | >75% Confirmado
+% De Batería Control RC | >30%/Confirmado
+Continuar Misión | Confirmados
+!Lista Chequeo En Despegue | Seguir
+
+== 8 | PARADA DE MOTORES
+Comunicaciones | Establecida
+Información Guardada | Confirmada
+Motores | Apagados
+Hélices | Detenidas
+Batería Dron | Apagada
+Confirmación Datos Guardados | Chequeado
+Control RC | Apagado
+Toma Tiempo | Chequeado
+
+== 9 | POST-VUELO
+Hélices | Plegadas/Aseguradas
+Brazos Traseros | Plegados/Recogidos
+Brazos Delanteros | Plegados/Recogidos
+Protector Gimbal | Puesto
+Módulo RTK / Accesorios | Retirados/N/A
+Batería De Vuelo | Retirada/Guardada
+Estado Aeronave | Normal/Guardada
+Estado Control RC | Guardado/Estado
+
+== 10 | POST-BRIEFING
+Cumplimiento De La Misión | Cumplida/SÍ. NO
+Calidad Datos Obtenidos | Requerido
+Novedad Operacional | Ninguna/SÍ. NO
+Dron Puerto | Removido
+Registro De Vuelo | Actualizado
+Post-Briefing | Completo

@@ -1,0 +1,7 @@
+# Listas de chequeo disponibles en la app (un archivo por línea, en el orden en que aparecen).
+# Para agregar una aeronave: copie su archivo .txt en esta carpeta y escriba aquí su nombre.
+m400-l2.txt
+matrice4e.txt
+mavic3-enterprise.txt
+mavic2-pro.txt
+phantom4-pro.txt
