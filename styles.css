@@ -146,3 +146,9 @@ body.en-alerta .sec.cur .box{box-shadow:0 0 0 4px #ff1a1a}
 @keyframes parpadeo{to{visibility:hidden}}
 @keyframes parpadeoFondo{50%{background:#b30000}}
 @media (prefers-reduced-motion:reduce){.crono.tarde,.alerta-paso{animation:none}}
+/* ítem donde quedó la lista cuando hay demora */
+.it.pendiente,.decide.pendiente{position:relative;background:#ffe3e3!important;outline:4px solid #ff1a1a;outline-offset:2px;border-radius:4px;animation:latido 1s ease-in-out infinite}
+.it.pendiente::before,.decide.pendiente::before{content:"▶ AQUÍ QUEDÓ LA LISTA";display:block;font-size:12px;font-weight:bold;letter-spacing:.05em;color:#fff;background:#ff1a1a;padding:3px 8px;margin:-6px -6px 6px;border-radius:3px 3px 0 0}
+.it.pendiente .nm,.it.pendiente .val{font-weight:bold}
+@keyframes latido{50%{outline-color:#7a0000;background:#ffc7c7}}
+@media (prefers-reduced-motion:reduce){.it.pendiente,.decide.pendiente{animation:none}}

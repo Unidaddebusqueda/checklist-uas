@@ -3,7 +3,7 @@
    Los registros se guardan en el dispositivo (IndexedDB) y se exportan como evidencia. */
 "use strict";
 
-const APP_VERSION = "1.4.0";
+const APP_VERSION = "1.5.0";
 const MAX_CICLOS = 8;
 const MAX_FOTOS = 4;
 const ENTIDAD = { nombre: "Unidad de Búsqueda de Personas Dadas por Desaparecidas", sigla: "UBPD", logo: "img/logo-ubpd.png" };
@@ -424,7 +424,7 @@ function datosVuelo(rec) {
     <div><b>Lugar</b>${esc(rec.lugar)}</div><div><b>Piloto No. 2</b>${rec.piloto2 ? `${esc(rec.piloto2.nombre)}${rec.piloto2.manual ? ` <span class="chip nov">manual</span>` : ""}<div class="small">C.C. ${esc(rec.piloto2.cedula)} · ${esc(rec.piloto2.cipu)}${rec.piloto2.vigencia ? " · " + esc(rec.piloto2.vigencia) : ""}</div>` : esc(rec.observador || "—")}</div><div><b>Mantenimiento 6 meses</b>${rec.mantVencido ? `<span class="chip nov">Vencido (${esc(rec.proxMant6)})</span>` : esc(rec.proxMant6 ? "Al día hasta " + rec.proxMant6 : "—")}</div>
     <div><b>Inicio</b>${esc(fmtDT(rec.inicio))}</div><div><b>Cierre</b>${esc(fmtDT(rec.fin))}</div>
     <div><b>Duración</b>${esc(dur(rec.inicio, rec.fin))}</div><div><b>GPS inicio</b>${esc(gpsTxt(rec.gpsInicio))}</div><div><b>GPS cierre</b>${esc(gpsTxt(rec.gpsCierre))}</div>
-    <div><b>Ciclos cambio de batería</b>${nCiclos(rec)}</div><div><b>Correcciones</b>${(rec.bitacora || []).filter(b => b.accion === "corrección").length}</div><div><b>Alertas por demora (&gt;30 s)</b>${(rec.bitacora || []).filter(b => b.accion === "alerta-inactividad").length}</div><div><b>Equipo</b>${esc(rec.equipo || "—")}</div>
+    <div><b>Ciclos cambio de batería</b>${nCiclos(rec)}</div><div><b>Correcciones</b>${(rec.bitacora || []).filter(b => b.accion === "corrección").length}</div><div><b>Alertas por demora (&gt;10 s)</b>${(rec.bitacora || []).filter(b => b.accion === "alerta-inactividad").length}</div><div><b>Equipo</b>${esc(rec.equipo || "—")}</div>
   </div>`;
 }
 function bloqueEvidencia(rec) {
@@ -498,8 +498,8 @@ function irAlPaso() {
   const el = document.getElementById("k_" + P.next.key.replace(/\./g, "_")) || document.querySelector(".sec.cur");
   el?.scrollIntoView({ block: "center", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
 }
-/* ---------------- contador entre pasos: alerta a los 30 segundos ---------------- */
-const LIMITE_SEG = 30, REPETIR_SONIDO_SEG = 10;
+/* ---------------- contador entre pasos: alerta a los 10 segundos ---------------- */
+const LIMITE_SEG = 10, REPETIR_SONIDO_SEG = 6;
 let audioCtx = null;
 function prepararAudio() { // debe llamarse desde un toque del usuario (requisito de iOS)
   try { audioCtx ||= new (window.AudioContext || window.webkitAudioContext)(); if (audioCtx.state === "suspended") audioCtx.resume(); } catch (e) { }
@@ -507,15 +507,24 @@ function prepararAudio() { // debe llamarse desde un toque del usuario (requisit
 function pitar() {
   if (!audioCtx) return;
   try {
-    const t0 = audioCtx.currentTime;
-    [0, 0.35, 0.7].forEach(d => {
-      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
-      o.type = "square"; o.frequency.value = 1046; o.connect(g); g.connect(audioCtx.destination);
-      g.gain.setValueAtTime(0.0001, t0 + d); g.gain.exponentialRampToValueAtTime(0.35, t0 + d + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t0 + d + 0.25);
-      o.start(t0 + d); o.stop(t0 + d + 0.27);
-    });
+    // Campanada de dos tonos tipo «master caution» (ding-dong ×2), con armónicos para que suene claro al aire libre
+    const t0 = audioCtx.currentTime + 0.02;
+    const maestro = audioCtx.createGain(); maestro.gain.value = 0.9; maestro.connect(audioCtx.destination); S._sonando = maestro;
+    const nota = (frec, t) => {
+      [[1, 0.55], [2, 0.18], [3, 0.08], [4.2, 0.04]].forEach(([mult, vol]) => {
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = "sine"; o.frequency.value = frec * mult; o.connect(g); g.connect(maestro);
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+        o.start(t); o.stop(t + 0.95);
+      });
+    };
+    [[1318.5, 0], [987.8, 0.32], [1318.5, 0.9], [987.8, 1.22]].forEach(([f, d]) => nota(f, t0 + d));
   } catch (e) { }
   try { navigator.vibrate?.([300, 150, 300]); } catch (e) { }
+}
+function silenciar() {
+  try { if (S._sonando) { S._sonando.gain.cancelScheduledValues(audioCtx.currentTime); S._sonando.gain.setValueAtTime(0, audioCtx.currentTime); S._sonando.disconnect(); S._sonando = null; } } catch (e) { }
+  try { navigator.vibrate?.(0); } catch (e) { }
 }
 let wakeLock = null;
 async function mantenerPantalla(on) {
@@ -535,16 +544,23 @@ const mmss = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 setInterval(async () => {
   const c = $("#crono"), al = $("#alertaPaso");
   if (S.view !== "run" || !S.cur || !c) { document.body.classList.remove("en-alerta"); return; }
-  const e = estadoCrono(S.cur);
+  const e = S.noteFor ? null : estadoCrono(S.cur); // mientras escribe una novedad no se cuenta
+  document.querySelectorAll(".it.pendiente").forEach(x => { if (!e || e.seg < LIMITE_SEG) x.classList.remove("pendiente"); });
   if (!e) { c.hidden = true; al.hidden = true; document.body.classList.remove("en-alerta"); return; }
   const tarde = e.seg >= LIMITE_SEG;
+  if (tarde) { // resaltar el ítem donde quedó la lista
+    const nx = progreso(S.cur).next; const el = nx && (document.getElementById("k_" + nx.key.replace(/\./g, "_")) || document.querySelector(".sec.cur .decide"));
+    if (el && !el.classList.contains("pendiente")) { el.classList.add("pendiente"); el.scrollIntoView({ block: "center", behavior: "smooth" }); }
+  }
   c.hidden = false; c.classList.toggle("tarde", tarde);
   c.textContent = tarde ? `⚠ ${mmss(e.seg)} detenido` : `Sección ${e.sec.id} · ${mmss(e.seg)} / ${mmss(LIMITE_SEG)}`;
   document.body.classList.toggle("en-alerta", tarde);
   al.hidden = !tarde;
   if (tarde) {
-    al.innerHTML = `<b>¡CONTINÚE LA LISTA DE CHEQUEO!</b><span>La sección ${esc(e.sec.id)} – ${esc(e.sec.t)} lleva ${mmss(e.seg)} sin avanzar. No la deje a medias.</span><button data-a="ir">Ir al paso pendiente</button>`;
-    if (S._pitidoDe !== e.ult || Date.now() - S._ultPitido >= REPETIR_SONIDO_SEG * 1000) { S._pitidoDe = e.ult; S._ultPitido = Date.now(); pitar(); }
+    const html = `<b>¡CONTINÚE LA LISTA DE CHEQUEO!</b><span>La sección ${esc(e.sec.id)} – ${esc(e.sec.t)} lleva <b id="alSeg" style="font-size:inherit"></b> sin avanzar. No la deje a medias.</span><span class="row" style="flex:0 0 auto">${S._silencioDe === e.ult ? `<span class="small">🔇 Sonido silenciado</span>` : `<button data-a="silenciar">🔇 Silenciar</button>`}<button data-a="ir">Ir al paso pendiente</button></span>`;
+    if (al._html !== html) { al.innerHTML = html; al._html = html; } // no rehacer cada segundo: los botones deben poder tocarse
+    $("#alSeg").textContent = mmss(e.seg);
+    if (S._silencioDe !== e.ult && (S._pitidoDe !== e.ult || Date.now() - S._ultPitido >= REPETIR_SONIDO_SEG * 1000)) { S._pitidoDe = e.ult; S._ultPitido = Date.now(); pitar(); }
     if (S.cur._alertaDe !== e.ult) { // una anotación por cada detención
       S.cur._alertaDe = e.ult; log(S.cur, "alerta-inactividad", { seccion: e.sec.id + (e.ciclo ? " ciclo " + e.ciclo : ""), desde: e.ult });
       await guardar(S.cur);
@@ -553,7 +569,7 @@ setInterval(async () => {
 }, 1000);
 
 async function responder(key, r, n) {
-  prepararAudio(); mantenerPantalla(true);
+  prepararAudio(); silenciar(); mantenerPantalla(true);
   const rec = S.cur; if (rec.estado === "cerrada") return;
   if (progreso(rec).next?.key !== key) return; // obliga el orden
   rec.resp[key] = { r, t: nowIso(), ...(n ? { n } : {}) }; rec._ult = key; S.noteFor = null;
@@ -568,6 +584,7 @@ document.addEventListener("click", async ev => {
   else if (a === "continuar") { const r = S.recs.find(x => x.id === id); if (!r) return; S.cur = JSON.parse(JSON.stringify(r)); S.view = "run"; render(); setTimeout(irAlPaso, 60); }
   else if (a === "ver") { S.verId = id; S.view = "ver"; render(); scrollTo(0, 0); }
   else if (a === "ir") irAlPaso();
+  else if (a === "silenciar") { const e = S.cur && estadoCrono(S.cur); if (e) { S._silencioDe = e.ult; silenciar(); const al = $("#alertaPaso"); al._html = null; } }
   else if (a === "desbloquear") {
     const clave = $("#claveBase").value; if (!clave) { toast("Escriba la clave de la unidad."); return; }
     b.disabled = true; b.textContent = "Verificando…";
