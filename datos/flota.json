@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-10",
+ "actualizado": "2026-11-11",
  "aeronaves": [
   {
    "marca": "DJI",
@@ -7,7 +7,7 @@
    "serial": "163CGBDR0A4Z5L",
    "matricula": "UBPD-2501",
    "ruas": "RUAS-100-25-B23H",
-   "proxMant6": "2026-06-04"
+   "proxMant6": ""
   },
   {
    "marca": "DJI",
@@ -15,7 +15,7 @@
    "serial": "163CGBDR0A4YKS",
    "matricula": "UBPD-2502",
    "ruas": "RUAS-100-24-3092",
-   "proxMant6": "2026-06-04"
+   "proxMant6": ""
   },
   {
    "marca": "DJI",
@@ -23,7 +23,7 @@
    "serial": "163CGBDR04YD7",
    "matricula": "UBPD-2504",
    "ruas": "RUAS-100-24-3100",
-   "proxMant6": "2026-06-04"
+   "proxMant6": ""
   },
   {
    "marca": "DJI",
@@ -31,7 +31,7 @@
    "serial": "163CGB9R0A4R7S",
    "matricula": "UBPD-2505",
    "ruas": "RUAS-100-24-3098",
-   "proxMant6": "2026-06-04"
+   "proxMant6": ""
   },
   {
    "marca": "DJI",
@@ -39,7 +39,7 @@
    "serial": "0AX2F8N00S1064",
    "matricula": "UBPD-2508",
    "ruas": "RUAS-100-24-3096",
-   "proxMant6": "2026-06-12"
+   "proxMant6": ""
   },
   {
    "marca": "DJI",
@@ -47,7 +47,7 @@
    "serial": "1581F5FHD23BR00DW77P",
    "matricula": "UBPD-2509",
    "ruas": "RUAS-100-25-B21B",
-   "proxMant6": "2026-06-04"
+   "proxMant6": ""
   },
   {
    "marca": "DJI",
@@ -55,7 +55,7 @@
    "serial": "1581F5FHD239900DY925",
    "matricula": "UBPD-2510",
    "ruas": "RUAS-100-24-3093",
-   "proxMant6": "2026-06-13"
+   "proxMant6": ""
   },
   {
    "marca": "DJI",
@@ -63,7 +63,7 @@
    "serial": "1581F5FHD23CN00DPLLY",
    "matricula": "UBPD-2511",
    "ruas": "RUAS-100-24-3094",
-   "proxMant6": "2026-06-04"
+   "proxMant6": ""
   },
   {
    "marca": "DJI",
@@ -71,7 +71,7 @@
    "serial": "1581F5FHD23BJ00DU87Z",
    "matricula": "UBPD-2512",
    "ruas": "RUAS-100-24-3097",
-   "proxMant6": "2026-06-04"
+   "proxMant6": ""
   },
   {
    "marca": "DJI",
@@ -79,23 +79,23 @@
    "serial": "1581F8DBW259100A2WTH",
    "matricula": "UBPD-2513",
    "ruas": "RUAS-100-26-F8HB",
-   "proxMant6": "2026-06-05"
+   "proxMant6": ""
   },
   {
    "marca": "DJI",
    "modelo": "MATRICE-4E",
    "serial": "1581F7FVC261L00D8LQ2",
    "matricula": "UBPD-2514",
-   "ruas": "",
-   "proxMant6": "2026-10-04"
+   "ruas": "RUAS-100-26-KM40",
+   "proxMant6": ""
   },
   {
    "marca": "DJI",
    "modelo": "MATRICE-400",
    "serial": "1581F8DBW25AD00A31BT",
    "matricula": "UBPD-2515",
-   "ruas": "",
-   "proxMant6": "2026-10-04"
+   "ruas": "RUAS-100-26-KM32",
+   "proxMant6": ""
   }
  ]
 }
