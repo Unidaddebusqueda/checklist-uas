@@ -3,7 +3,7 @@
    Los registros se guardan en el dispositivo (IndexedDB) y se exportan como evidencia. */
 "use strict";
 
-const APP_VERSION = "1.1.0";
+const APP_VERSION = "1.2.0";
 const MAX_CICLOS = 8;
 const MAX_FOTOS = 4;
 const ENTIDAD = { nombre: "Unidad de Búsqueda de Personas Dadas por Desaparecidas", sigla: "UBPD", logo: "img/logo-ubpd.png" };
@@ -193,8 +193,9 @@ function vHome() {
     ${S.errores.map(e => `<div class="banner" style="margin-top:10px">${esc(e)}</div>`).join("")}
     ${abiertas.length ? `<h2 style="margin-top:14px">Listas sin cerrar</h2>` + abiertas.map(r => { const P = progreso(r); return `<div class="panel navy"><div class="row" style="justify-content:space-between"><div><b>${esc(r.plantilla.meta.corto)}</b> · ${esc(r.matricula || r.serial)} · OV ${esc(ordenTxt(r))}<div class="small muted">${esc(r.piloto)} · inicio ${esc(fmtDT(r.inicio))} · ${P.done}/${P.total} pasos</div></div><div class="row"><button class="lnk" data-a="borrar" data-id="${esc(r.id)}">Descartar</button><button class="pri" data-a="continuar" data-id="${esc(r.id)}">Continuar</button></div></div>${S.confirmBorrar === r.id ? `<div class="banner row" style="justify-content:space-between"><span>¿Descartar esta lista sin cerrar? No se puede recuperar.</span><span class="row"><button data-a="borrar-no">No</button><button class="warn" data-a="borrar-si" data-id="${esc(r.id)}">Sí, descartar</button></span></div>` : ""}</div>`; }).join("") : ""}
     <div class="panel ${bp ? "" : "navy"}" style="margin-top:14px"><div class="row" style="justify-content:space-between">
-      <div><b>Base de pilotos y aeronaves</b><div class="small muted">${bp ? `${bp.pilotos.length} pilotos${bf ? ` · ${bf.aeronaves.length} aeronaves` : ""} · cargada el ${esc(fmtDT(bp.cargado))} desde «${esc(bp.archivo)}». Se guarda solo en este equipo.` : "Este equipo no tiene la base de pilotos. Cargue el Excel «LISTADO DE PILOTOS DE DRON» para que la cédula traiga los datos automáticamente."}</div></div>
-      <label class="small" style="font-weight:normal"><span class="noprint" style="display:inline-block;padding:10px 14px;border:1px solid var(--navy);border-radius:6px;background:${bp ? "#fff" : "var(--navy)"};color:${bp ? "var(--navy)" : "#fff"};font-weight:bold;cursor:pointer">${bp ? "Actualizar Excel" : "Cargar Excel"}</span><input type="file" id="xlsBase" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden></label>
+      <div style="flex:1 1 260px"><b>Base de pilotos</b><div class="small muted">${bp ? `${bp.pilotos.length} pilotos activos en este equipo · ${esc(bp.archivo)} · cargada el ${esc(fmtDT(bp.cargado))}.` : S.baseCifrada ? "Escriba la clave de la unidad para activar la base de pilotos en este equipo. Solo se hace una vez." : "Este equipo no tiene la base de pilotos."}</div></div>
+      ${!bp && S.baseCifrada ? `<div class="row" style="flex:1 1 300px"><input id="claveBase" type="password" autocomplete="current-password" placeholder="Clave de la unidad" style="flex:1 1 180px"><button class="pri" data-a="desbloquear">Activar base</button></div>` : ""}
+      <label class="small noprint" style="font-weight:normal"><span class="lnk" style="text-decoration:underline;color:var(--navy);cursor:pointer;padding:6px">${bp ? "Cargar otro Excel" : "o cargar desde Excel"}</span><input type="file" id="xlsBase" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden></label>
     </div></div>
     <h2 style="margin-top:16px">Iniciar lista de chequeo</h2>
     <div class="cards">${S.listas.map(L => `<div class="card">
@@ -224,6 +225,17 @@ function flotaDeLista(L) {
 }
 function buscarPiloto(cc) { const c = soloDig(cc); return c ? (basePilotos()?.pilotos || []).find(p => soloDig(p.cedula) === c) : null; }
 
+async function desbloquearBase(clave) {
+  const B = S.baseCifrada; if (!B) throw new Error("sin base cifrada");
+  const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+  const material = await crypto.subtle.importKey("raw", new TextEncoder().encode(clave), "PBKDF2", false, ["deriveKey"]);
+  const key = await crypto.subtle.deriveKey({ name: "PBKDF2", salt: b64(B.sal), iterations: B.iter, hash: "SHA-256" }, material, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+  const plano = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64(B.iv) }, key, b64(B.datos)); // falla si la clave es incorrecta
+  const { pilotos } = JSON.parse(new TextDecoder().decode(plano));
+  lsSet("uas_base_pilotos", { origen: "cifrada", generado: B.generado, archivo: "Base de la unidad del " + fmtDT(B.generado), cargado: nowIso(), pilotos });
+  lsSet("uas_clave_base", clave);
+  return pilotos.length;
+}
 async function cargarLibXLSX() {
   if (window.XLSX) return;
   await new Promise((res, rej) => { const s = document.createElement("script"); s.src = "vendor/xlsx.full.min.js"; s.onload = res; s.onerror = () => rej(new Error("no se pudo cargar el lector de Excel")); document.head.appendChild(s); });
@@ -488,6 +500,12 @@ document.addEventListener("click", async ev => {
   else if (a === "continuar") { const r = S.recs.find(x => x.id === id); if (!r) return; S.cur = JSON.parse(JSON.stringify(r)); S.view = "run"; render(); setTimeout(irAlPaso, 60); }
   else if (a === "ver") { S.verId = id; S.view = "ver"; render(); scrollTo(0, 0); }
   else if (a === "ir") irAlPaso();
+  else if (a === "desbloquear") {
+    const clave = $("#claveBase").value; if (!clave) { toast("Escriba la clave de la unidad."); return; }
+    b.disabled = true; b.textContent = "Verificando…";
+    try { const n = await desbloquearBase(clave); toast(`Base activada: ${n} pilotos.`, 3500); render(); }
+    catch (e) { b.disabled = false; b.textContent = "Activar base"; toast("Clave incorrecta. Verifique e intente de nuevo.", 4000); $("#claveBase").select(); }
+  }
   else if (a === "buscar-cc") { mostrarPiloto(); if (!S.pilotoSel && basePilotos()) toast("Cédula no encontrada en la base de pilotos."); }
   else if (a === "res" || a === "dec") responder(b.dataset.k, b.dataset.r);
   else if (a === "nov") { S.noteFor = b.dataset.k; render(); const t = $("#nota"); t?.focus(); }
@@ -591,6 +609,12 @@ window.addEventListener("offline", () => S.view === "home" && render());
   const { out, errores } = await cargarListas(); S.listas = out; S.errores.push(...errores);
   try { S.divipola = await (await fetch("datos/divipola.json")).json(); } catch (e) { S.errores.push("No se pudo cargar la lista de departamentos y municipios."); }
   try { S.flotaWeb = await (await fetch("datos/flota.json", { cache: "no-cache" })).json(); } catch (e) { /* se usa la del Excel si existe */ }
+  try {
+    S.baseCifrada = await (await fetch("datos/pilotos.enc.json", { cache: "no-cache" })).json();
+    // si el equipo ya tiene la clave y se publicó una base más nueva, se actualiza sola
+    const bp = basePilotos(), clave = lsGet("uas_clave_base", null);
+    if (clave && bp?.origen === "cifrada" && bp.generado !== S.baseCifrada.generado) await desbloquearBase(clave).catch(() => { });
+  } catch (e) { S.baseCifrada = null; }
   render();
   if ("serviceWorker" in navigator && location.protocol !== "file:") {
     try {

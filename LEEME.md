@@ -62,17 +62,22 @@ Después de abrirla una vez con internet, funciona **sin señal**.
 
 ---
 
-## 2b. Cargar la base de pilotos y aeronaves en cada iPad (una vez)
+## 2b. Activar la base de pilotos en cada iPad (una vez)
 
-La cédula del piloto trae automáticamente su **nombre, Certificado CIPU, vigencia y sede**. Para eso, cada iPad necesita el Excel **«LISTADO DE PILOTOS DE DRON.xlsx»** (hojas *Pilotos_Poliza* y *Aeronave_UAS*).
+La cédula del piloto trae automáticamente su **nombre, Certificado CIPU, vigencia y sede**.
 
-1. Envíe el Excel al iPad por AirDrop, correo, OneDrive o WhatsApp y guárdelo en **Archivos**.
-2. En la app, en la pantalla de inicio, toque **Cargar Excel** y elija el archivo.
-3. La app muestra cuántos pilotos y aeronaves cargó.
+1. En la pantalla de inicio, en «Base de pilotos», escriba la **clave de la unidad** y toque **Activar base**.
+2. La app confirma: «Base activada: 33 pilotos».
 
-> **Protección de datos (Ley 1581 de 2012):** las cédulas **no se publican en internet**. Quedan guardadas solo en el iPad donde se cargó el Excel. **Nunca suba el Excel a GitHub.**
+> **Protección de datos (Ley 1581 de 2012):** la base va publicada **cifrada** (AES-256) en `datos/pilotos.enc.json`. Sin la clave no se pueden leer nombres ni cédulas. Entregue la clave solo al personal autorizado y **nunca suba el Excel a GitHub**.
 
-Cuando cambie el personal o la flota, actualice el Excel y vuelva a tocar **Actualizar Excel** en cada iPad.
+**Cuando cambie el personal:** actualice el Excel y genere de nuevo la base cifrada con la misma clave:
+```
+pip install openpyxl cryptography
+python herramientas/cifrar_base.py "LISTADO DE PILOTOS DE DRON.xlsx"
+```
+Suba el nuevo `datos/pilotos.enc.json` y cambie el número de CACHE en `sw.js`. Los iPad que ya tienen la clave se actualizan solos.
+(Alternativa sin clave: el enlace «cargar desde Excel» de la pantalla de inicio lee el Excel directamente en ese equipo.)
 
 **Aeronaves:** la lista desplegable de *Serial / Matrícula / RUAS* muestra solo las aeronaves del modelo de la lista elegida (columna MODELO del Excel). Las aeronaves con TERRITORIAL «CASO DE HURTO» se excluyen, igual que los Matrice M210. Si el mantenimiento de 6 meses está vencido, la app lo advierte y lo deja anotado en la evidencia. La flota también está publicada en `datos/flota.json` (sin datos personales). Al cargar el Excel en un iPad, esa flota reemplaza la publicada.
 

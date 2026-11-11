@@ -1,8 +1,8 @@
 /* Service worker: guarda la app y las listas en el equipo para usarlas sin internet.
    Cuando cambie algún archivo, suba el número de CACHE para que los equipos se actualicen. */
-const CACHE = "checklist-uas-v3";
+const CACHE = "checklist-uas-v4";
 const BASE = ["./", "index.html", "styles.css", "app.js", "manifest.webmanifest",
-  "datos/divipola.json", "datos/flota.json", "vendor/xlsx.full.min.js",
+  "datos/divipola.json", "datos/flota.json", "datos/pilotos.enc.json", "vendor/xlsx.full.min.js",
   "img/logo-ubpd.png", "img/logo-dji.png", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png",
   "listas/indice.txt"];
 
@@ -32,7 +32,7 @@ self.addEventListener("fetch", ev => {
   const req = ev.request; const url = new URL(req.url);
   if (req.method !== "GET" || url.origin !== location.origin) return;
   // Listas: primero la red (para recibir cambios), si no hay señal usa la copia guardada.
-  if (url.pathname.includes("/listas/") || url.pathname.endsWith("/flota.json")) {
+  if (url.pathname.includes("/listas/") || url.pathname.endsWith("/flota.json") || url.pathname.endsWith("/pilotos.enc.json")) {
     ev.respondWith((async () => {
       const c = await caches.open(CACHE);
       try { const r = await fetch(req, { cache: "no-cache" }); if (r.ok) c.put(req, r.clone()); return r; }
