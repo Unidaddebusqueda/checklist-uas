@@ -49,7 +49,7 @@ Vuelo Automático | Cargado/Ajustado
 Toma De Tiempo Inicio | Chequeado
 Área De Vuelo | Libre/Despejada
 *Dron Puerto | Instalado/Asegurado
-Inicio Motores | Rotación/Confirmada
+Inicio Motores | Rotación/Confirmada | PRENDE
 Hélices | Girando/Confirmado
 Vuelo Estacionario | 1 Metro/Ajustado
 Controles De Vuelo | Modo 2/Normal
@@ -59,7 +59,7 @@ Controles De Vuelo | Modo 2/Normal
 == 4 | DESPEGUE | rojo
 Comunicaciones Requeridas | Establecida
 Autorización Despegue | Recibida
-Ascenso | Ajustado
+Ascenso | Ajustado | DECOLA
 Indicaciones (GPS, Señal RC, % Baterías, Altitud, Distancia) | Chequeo/Cruzado
 Potencia Motores | Ajustado
 Misión | Ejecutar/Chequeado
@@ -81,16 +81,16 @@ Obstáculos Físicos | Libre
 Distancia Punto Origen | Chequeada
 Altura A 20 Metros | RTH/OFF
 Vuelo Manual | Iniciado
-Call Outs De Alturas 20, 15, 10, 5, Mínimos | Chequeado
+Call Outs De Alturas 20, 15, 10, 5, Mínimos | Chequeado | ATERRIZA
 
 == 7 | TRÁNSITO CAMBIO DE BATERÍA | repetible
 Batería Dron | Reemplazada
 Área De Vuelo | Libre/Despejada
 Encendido Dron | Confirmado
 DJI Pilot | En línea
-Inicio Motores | Rotación/Confirmada
+Inicio Motores | Rotación/Confirmada | PRENDE
 Hélices | Girando/Confirmado
-Vuelo Estacionario | 1 Metro/Ajustado
+Vuelo Estacionario | 1 Metro/Ajustado | DECOLA
 % De Batería Dron | >75% Confirmado
 % De Batería Control RC | >75%/Confirmado
 Datos Para Continuar Misión | Confirmados
@@ -99,7 +99,7 @@ Datos Para Continuar Misión | Confirmados
 == 8 | PARADA DE MOTORES
 Comunicaciones | Establecida
 Información Guardada | Confirmada
-Motores | Apagados
+Motores | Apagados | APAGA
 Hélices | Detenidas
 Batería Dron | Apagada
 Confirmación Datos Guardados | Chequeado

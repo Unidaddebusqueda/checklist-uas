@@ -152,3 +152,30 @@ body.en-alerta .sec.cur .box{box-shadow:0 0 0 4px #ff1a1a}
 .it.pendiente .nm,.it.pendiente .val{font-weight:bold}
 @keyframes latido{50%{outline-color:#7a0000;background:#ffc7c7}}
 @media (prefers-reduced-motion:reduce){.it.pendiente,.decide.pendiente{animation:none}}
+
+/* Eventos de vuelo (PRENDE, DECOLA, ATERRIZA, APAGA) con su hora */
+.evt-l{margin:2px 0 0}
+.evt{display:inline-block;font-size:11px;font-weight:bold;border-radius:10px;padding:1px 8px;white-space:nowrap;font-family:var(--mono)}
+.evt-prende{background:#eeedfe;color:#3c3489}
+.evt-decola{background:#e1f5ee;color:#085041}
+.evt-aterriza{background:#faeeda;color:#633806}
+.evt-apaga{background:#fcebeb;color:#791f1f}
+.it.auto .nm{font-style:italic}
+.tiempos{margin:12px 0}
+.tiempos h2{margin:0 0 6px}
+.tiempos td,.tiempos th{text-align:center;white-space:nowrap}
+.tiempos td:first-child,.tiempos th:first-child{text-align:left}
+.tiempos tr.total td{background:#f4f1fc}
+@media print{.evt,.tiempos th,.tiempos tr.total td{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+/* Celular: cada vuelo como tarjeta (la tabla de 7 columnas no cabe) */
+@media screen and (max-width:600px){
+  .tiempos .tbl{border:0;overflow:visible}
+  .tiempos thead{display:none}
+  .tiempos table,.tiempos tbody{display:block}
+  .tiempos tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border:1px solid #999;margin-bottom:8px}
+  .tiempos td{display:block;white-space:normal;text-align:left!important;border-bottom:1px solid #ddd;padding:6px 8px;font-size:14px}
+  .tiempos td::before{content:attr(data-l);display:block;font-size:11px;font-weight:bold;color:var(--muted)}
+  .tiempos td:first-child{grid-column:1/-1;background:#f4f1fc;font-weight:bold}
+  .tiempos td:first-child::before,.tiempos td[colspan]::before{content:none}
+  .tiempos td[colspan]{grid-column:1/-1}
+}

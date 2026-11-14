@@ -3,7 +3,7 @@
    Los registros se guardan en el dispositivo (IndexedDB) y se exportan como evidencia. */
 "use strict";
 
-const APP_VERSION = "1.5.0";
+const APP_VERSION = "1.6.0";
 const MAX_CICLOS = 8;
 const MAX_FOTOS = 4;
 const ENTIDAD = { nombre: "Unidad de Búsqueda de Personas Dadas por Desaparecidas", sigla: "UBPD", logo: "img/logo-ubpd.png" };
@@ -14,6 +14,9 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": 
 const nowIso = () => new Date().toISOString();
 const fmtDT = iso => iso ? new Date(iso).toLocaleString("es-CO", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }) : "—";
 const fmtT = iso => iso ? new Date(iso).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }) : "—";
+const fmtHM = iso => iso ? new Date(iso).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit", hour12: false }) : "—";
+// Duración en formato de hora HH:MM (segundos redondeados al minuto).
+const hhmm = s => { if (s == null) return "—"; const m = Math.round(s / 60); return String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0"); };
 const dur = (a, b) => { if (!a || !b) return "—"; const m = Math.round((new Date(b) - new Date(a)) / 60000); return m < 60 ? m + " min" : Math.floor(m / 60) + " h " + (m % 60) + " min"; };
 const RES = { ok: ["CUMPLE", "ok", "✓"], na: ["N/A", "na", "—"], nov: ["NOVEDAD", "nov", "!"] };
 function toast(msg, ms = 2800) { const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => t.hidden = true, ms); }
@@ -57,8 +60,10 @@ function parseLista(txt, archivo) {
     if (!sec) { const m = line.match(/^([A-Za-zÁÉÍÓÚáéíóúÑñ_]+)\s*:\s*(.*)$/); if (m) L.meta[m[1].toLowerCase()] = m[2].trim(); continue; }
     let nm = line, rojo = false, neg = false;
     while (/^[!*]/.test(nm)) { if (nm[0] === "!") rojo = true; else neg = true; nm = nm.slice(1).trim(); }
-    const i = nm.indexOf("|");
-    sec.items.push({ n: (i < 0 ? nm : nm.slice(0, i)).trim(), v: i < 0 ? "" : nm.slice(i + 1).trim(), rojo, neg });
+    // Ítem | Valor esperado | EVENTO (opcional: PRENDE, DECOLA, ATERRIZA o APAGA)
+    const partes = nm.split("|").map(s => s.trim());
+    const ev = (partes[2] || "").toUpperCase();
+    sec.items.push({ n: partes[0], v: partes[1] || "", rojo, neg, ...(EVENTOS.includes(ev) ? { ev } : {}) });
   }
   L.meta.aeronave ||= L.id; L.meta.corto ||= L.meta.aeronave; L.meta.tipo ||= "NORMAL CHECK LIST";
   return L;
@@ -82,19 +87,64 @@ async function cargarListas() {
 }
 
 /* ---------------- secuencia de pasos ---------------- */
+/* Eventos de vuelo: la hora en que se marca el ítem es la hora del evento.
+   Tiempo tripulación = PRENDE → APAGA. Tiempo aeronave = DECOLA → ATERRIZA. */
+const EVENTOS = ["PRENDE", "DECOLA", "ATERRIZA", "APAGA"];
+// Ítems que la app agrega en los cambios de batería: cada ciclo es un vuelo nuevo
+// y necesita su propio aterrizaje y apagado (la lista impresa no los trae).
+const ITEM_ATERRIZA = { n: "Aterrizaje", v: "Confirmado", ev: "ATERRIZA", auto: true };
+const ITEM_APAGA = { n: "Motores", v: "Apagados", ev: "APAGA", auto: true };
+const tieneEvento = (s, ev) => s.items.some(it => it.ev === ev);
+
 function pasos(rec) {
   const out = [];
+  const conEventos = rec.plantilla.secciones.some(s => s.items.some(it => it.ev));
+  let ciclosVuelo = 0;
   for (const s of rec.plantilla.secciones) {
     if (s.repetible) {
+      const esVuelo = conEventos && tieneEvento(s, "PRENDE");
       for (let c = 1; c <= MAX_CICLOS; c++) {
         const dk = `${s.id}d${c}`; out.push({ kind: "dec", key: dk, sec: s, ciclo: c });
         if (rec.resp[dk]?.r !== "si") break;
+        if (esVuelo) {
+          // Ciclo 1: el vuelo anterior ya aterrizó en DESCENSO; falta apagar.
+          // Ciclo 2 en adelante: el vuelo anterior es el del ciclo previo.
+          if (c > 1) out.push({ kind: "item", key: `${s.id}c${c}.at`, sec: s, ciclo: c, it: ITEM_ATERRIZA });
+          out.push({ kind: "item", key: `${s.id}c${c}.ap`, sec: s, ciclo: c, it: ITEM_APAGA });
+          ciclosVuelo++;
+        }
         s.items.forEach((it, i) => out.push({ kind: "item", key: `${s.id}c${c}.${i}`, sec: s, ciclo: c, it }));
       }
-    } else s.items.forEach((it, i) => out.push({ kind: "item", key: `${s.id}.${i}`, sec: s, it }));
+    } else {
+      // Si hubo cambios de batería, el último vuelo aterriza antes de la parada de motores.
+      if (ciclosVuelo > 0 && tieneEvento(s, "APAGA")) out.push({ kind: "item", key: `${s.id}.at`, sec: s, it: ITEM_ATERRIZA });
+      s.items.forEach((it, i) => out.push({ kind: "item", key: `${s.id}.${i}`, sec: s, it }));
+    }
   }
   return out;
 }
+
+/* Vuelos del registro con sus cuatro horas y los tiempos de tripulación y aeronave (en segundos). */
+function tiemposVuelo(rec) {
+  const vuelos = [];
+  for (const p of pasos(rec)) {
+    if (p.kind !== "item" || !p.it.ev) continue;
+    const r = rec.resp[p.key]; if (!r || r.r === "na") continue;
+    const ev = p.it.ev.toLowerCase();
+    if (ev === "prende" || !vuelos.length) vuelos.push({});
+    const v = vuelos[vuelos.length - 1];
+    if (!v[ev]) v[ev] = r.t;
+  }
+  const seg = (a, b) => a && b ? Math.max(0, Math.round((new Date(b) - new Date(a)) / 1000)) : null;
+  let trip = 0, aero = 0;
+  for (const v of vuelos) {
+    v.tripulacion = seg(v.prende, v.apaga); v.aeronave = seg(v.decola, v.aterriza);
+    // El total suma los minutos ya redondeados de cada vuelo, para que cuadre con la tabla.
+    trip += Math.round((v.tripulacion || 0) / 60) * 60; aero += Math.round((v.aeronave || 0) / 60) * 60;
+  }
+  return { vuelos, tripulacion: trip, aeronave: aero };
+}
+const plantillaConEventos = rec => rec.plantilla.secciones.some(s => s.items.some(it => it.ev));
 function progreso(rec) { const st = pasos(rec); return { st, done: st.filter(x => rec.resp[x.key]).length, total: st.length, next: st.find(x => !rec.resp[x.key]) }; }
 const nNov = rec => Object.values(rec.resp).filter(r => r.r === "nov").length;
 const nCiclos = rec => Object.entries(rec.resp).filter(([k, v]) => /d\d+$/.test(k) && v.r === "si").length;
@@ -366,7 +416,9 @@ function filaItem(rec, p, isNext, cerrada) {
   else if (isNext && !cerrada) extra = S.noteFor === p.key
     ? `<div class="note"><label for="nota"><span>Describa la novedad y la acción tomada</span><textarea id="nota"></textarea></label><div class="row"><button class="warn" data-a="nov-ok" data-k="${p.key}">Registrar novedad</button><button data-a="nov-no">Cancelar</button></div></div>`
     : `<div class="acts"><button class="ok" data-a="res" data-r="ok" data-k="${p.key}">✓ CUMPLE</button><button data-a="res" data-r="na" data-k="${p.key}">N/A</button><button class="warn" data-a="nov" data-k="${p.key}">NOVEDAD</button></div>`;
-  return `<div class="${cls}" id="k_${p.key.replace(/\./g, "_")}"><div class="ln"><span class="nm">${esc(it.n)}</span><span class="dots"></span><span class="val">${esc(it.v)}</span><span class="mk">${r ? RES[r.r][2] : ""}</span></div>${extra}</div>`;
+  // Etiqueta del evento en su propia línea, para que no apriete el nombre del ítem en el celular.
+  const evt = it.ev ? `<div class="evt-l"><span class="evt evt-${it.ev.toLowerCase()}">${it.ev}${r && r.r !== "na" ? " " + fmtHM(r.t) : ""}</span></div>` : "";
+  return `<div class="${cls}${it.auto ? " auto" : ""}" id="k_${p.key.replace(/\./g, "_")}"><div class="ln"><span class="nm">${esc(it.n)}</span><span class="dots"></span><span class="val">${esc(it.v)}</span><span class="mk">${r ? RES[r.r][2] : ""}</span></div>${evt}${extra}</div>`;
 }
 
 function grupos(st) {
@@ -398,6 +450,7 @@ function vRun() {
   const pct = Math.round(P.done / P.total * 100);
   const cierre = !P.next && !cerrada ? `<div class="panel navy" id="cierre"><h2>Cierre y firma del registro</h2>
     <div class="grid-kv"><div><b>Pasos</b>${P.done}/${P.total}</div><div><b>Novedades</b>${nNov(rec)}</div><div><b>Duración</b>${dur(rec.inicio, nowIso())}</div></div>
+    ${bloqueTiempos(rec)}
     <label for="obs"><span>Observaciones generales (opcional)</span><textarea id="obs">${esc(rec.observaciones || "")}</textarea></label>
     <div><b class="small">Fotos de evidencia (opcional, hasta ${MAX_FOTOS})</b>
       <div class="fotos" style="margin:6px 0">${(rec.fotos || []).map((f, i) => `<figure><img src="${f.data}" alt="Foto ${i + 1}"><figcaption>${fmtT(f.t)} · <button class="lnk" data-a="foto-del" data-i="${i}">Quitar</button></figcaption></figure>`).join("")}</div>
@@ -427,6 +480,17 @@ function datosVuelo(rec) {
     <div><b>Ciclos cambio de batería</b>${nCiclos(rec)}</div><div><b>Correcciones</b>${(rec.bitacora || []).filter(b => b.accion === "corrección").length}</div><div><b>Alertas por demora (&gt;10 s)</b>${(rec.bitacora || []).filter(b => b.accion === "alerta-inactividad").length}</div><div><b>Equipo</b>${esc(rec.equipo || "—")}</div>
   </div>`;
 }
+/* Tabla de tiempos: una fila por vuelo (el principal y uno por cada cambio de batería). */
+function bloqueTiempos(rec) {
+  if (!plantillaConEventos(rec)) return "";
+  const T = tiemposVuelo(rec);
+  // data-l: rótulo de cada dato cuando la tabla se muestra como tarjetas en el celular.
+  const filas = T.vuelos.map((v, i) => `<tr><td>${i === 0 ? "Vuelo 1" : `Vuelo ${i + 1} <span class="small muted">(batería ${i})</span>`}</td><td data-l="PRENDE">${fmtHM(v.prende)}</td><td data-l="DECOLA">${fmtHM(v.decola)}</td><td data-l="ATERRIZA">${fmtHM(v.aterriza)}</td><td data-l="APAGA">${fmtHM(v.apaga)}</td><td data-l="Tiempo tripulación"><b>${hhmm(v.tripulacion)}</b></td><td data-l="Tiempo aeronave"><b>${hhmm(v.aeronave)}</b></td></tr>`).join("");
+  return `<div class="tiempos"><h2>Tiempos de vuelo</h2>
+    <div class="tbl"><table><thead><tr><th>Vuelo</th><th>PRENDE</th><th>DECOLA</th><th>ATERRIZA</th><th>APAGA</th><th>Tiempo tripulación<div class="small">prende → apaga</div></th><th>Tiempo aeronave<div class="small">decola → aterriza</div></th></tr></thead>
+    <tbody>${filas || `<tr><td colspan="7" class="muted">Aún no se ha registrado ningún evento.</td></tr>`}
+    ${T.vuelos.length > 1 ? `<tr class="total"><td colspan="5"><b>TOTAL</b></td><td data-l="Tiempo tripulación"><b>${hhmm(T.tripulacion)}</b></td><td data-l="Tiempo aeronave"><b>${hhmm(T.aeronave)}</b></td></tr>` : ""}</tbody></table></div></div>`;
+}
 function bloqueEvidencia(rec) {
   return `${rec.observaciones ? `<p><b>Observaciones:</b> ${esc(rec.observaciones)}</p>` : ""}
     ${(rec.fotos || []).length ? `<div><b class="small">Fotos</b><div class="fotos">${rec.fotos.map((f, i) => `<figure><img src="${f.data}" alt="Foto ${i + 1}"><figcaption>${esc(fmtDT(f.t))}</figcaption></figure>`).join("")}</div></div>` : ""}
@@ -446,6 +510,7 @@ function vVer(rec) {
       <button data-a="json" data-id="${esc(rec.id)}">Archivo de verificación</button>${rec.hash ? `<button data-a="integridad" data-id="${esc(rec.id)}">Verificar integridad</button>` : ""}</div></div>
     ${header(L, rec.revision)}<div class="acft">${esc(L.meta.aeronave)} · EVIDENCIA DE EJECUCIÓN</div>
     ${datosVuelo(rec)}
+    ${bloqueTiempos(rec)}
     ${hojaSecciones(rec, false)}
     ${bloqueEvidencia(rec)}
     <p class="foot">${esc(L.meta.elaboro || "")}${L.meta.elaboro ? " · " : ""}${esc(ENTIDAD.nombre)} · Generado con Listas de Chequeo UAS v${esc(rec.appVersion || APP_VERSION)}</p></div>`;
@@ -483,11 +548,19 @@ async function entregar(nombre, contenido, tipo) {
   toast("Archivo descargado: " + nombre);
 }
 const csvC = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+function columnasTiempos(r) {
+  if (!plantillaConEventos(r)) return ["", "", "", "", "", "", "", ""];
+  const T = tiemposVuelo(r), V = T.vuelos, ult = V[V.length - 1] || {};
+  const det = V.map((v, i) => `V${i + 1}: prende ${fmtHM(v.prende)}, decola ${fmtHM(v.decola)}, aterriza ${fmtHM(v.aterriza)}, apaga ${fmtHM(v.apaga)}`).join(" | ");
+  return [V.length, fmtHM(V[0]?.prende), fmtHM(V[0]?.decola), fmtHM(ult.aterriza), fmtHM(ult.apaga), hhmm(T.tripulacion), hhmm(T.aeronave), det];
+}
 function csvHistorial() {
-  const rows = [["Registro", "Aeronave", "Revisión", "Piloto", "Cédula", "Certificado CIPU", "Vigencia CIPU", "Piloto No. 2", "Cédula Piloto No. 2", "CIPU Piloto No. 2", "Serial", "Matrícula", "RUAS", "No. orden de vuelo", "Departamento", "Municipio", "Lugar", "Inicio", "Cierre", "Duración", "Estado", "Novedades", "Ciclos batería", "Mantenimiento vencido", "GPS inicio", "GPS cierre", "Código verificación", "Detalle novedades"]];
+  const rows = [["Registro", "Aeronave", "Revisión", "Piloto", "Cédula", "Certificado CIPU", "Vigencia CIPU", "Piloto No. 2", "Cédula Piloto No. 2", "CIPU Piloto No. 2", "Serial", "Matrícula", "RUAS", "No. orden de vuelo", "Departamento", "Municipio", "Lugar", "Inicio", "Cierre", "Duración", "Estado", "Novedades", "Ciclos batería", "Mantenimiento vencido", "GPS inicio", "GPS cierre", "Código verificación", "Detalle novedades",
+    "Vuelos", "Prende (vuelo 1)", "Decola (vuelo 1)", "Aterriza (último vuelo)", "Apaga (último vuelo)", "Tiempo tripulación", "Tiempo aeronave", "Detalle tiempos"]];
   for (const r of [...S.recs].sort((a, b) => (a.inicio || "").localeCompare(b.inicio || ""))) {
     const novs = progreso(r).st.filter(p => r.resp[p.key]?.r === "nov").map(p => `${p.sec.id}. ${p.it.n}: ${r.resp[p.key].n}`).join(" | ");
-    rows.push([r.id, r.plantilla.meta.aeronave, r.revision, r.piloto, r.cedula, cipuTxt(r), r.vigenciaCipu, r.piloto2?.nombre || r.observador || "", r.piloto2?.cedula || "", r.piloto2?.cipu || "", r.serial, r.matricula, r.ruas, ordenTxt(r), r.departamento, r.municipio, r.lugar, fmtDT(r.inicio), fmtDT(r.fin), dur(r.inicio, r.fin), r.estado, nNov(r), nCiclos(r), r.mantVencido ? "SÍ" : "NO", gpsTxt(r.gpsInicio), gpsTxt(r.gpsCierre), r.hash || "", novs]);
+    rows.push([r.id, r.plantilla.meta.aeronave, r.revision, r.piloto, r.cedula, cipuTxt(r), r.vigenciaCipu, r.piloto2?.nombre || r.observador || "", r.piloto2?.cedula || "", r.piloto2?.cipu || "", r.serial, r.matricula, r.ruas, ordenTxt(r), r.departamento, r.municipio, r.lugar, fmtDT(r.inicio), fmtDT(r.fin), dur(r.inicio, r.fin), r.estado, nNov(r), nCiclos(r), r.mantVencido ? "SÍ" : "NO", gpsTxt(r.gpsInicio), gpsTxt(r.gpsCierre), r.hash || "", novs,
+      ...columnasTiempos(r)]);
   }
   return "﻿" + rows.map(r => r.map(csvC).join(";")).join("\r\n");
 }

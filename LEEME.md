@@ -120,9 +120,28 @@ Batería Dron | Reemplazada
 | `== N \| TÍTULO \| rojo` | Título de sección resaltado en rojo |
 | `== N \| TÍTULO \| repetible` | Sección que se puede repetir (pregunta «¿Se realiza?») |
 | `Ítem \| Valor esperado` | Ítem normal |
+| `Ítem \| Valor \| PRENDE` | Ítem que registra la **hora** de un evento de vuelo: `PRENDE`, `DECOLA`, `ATERRIZA` o `APAGA` |
 | `!Ítem \| Valor` | Ítem en rojo (inspección de componente principal) |
 | `*Ítem \| Valor` | Ítem en negrilla |
 | `# texto` | Comentario (se ignora) |
+
+### Horas de vuelo: PRENDE, DECOLA, ATERRIZA y APAGA
+
+La hora de cada evento es la hora en que el piloto marca el ítem. Con esas horas la app calcula:
+
+- **Tiempo tripulación** = de PRENDE a APAGA.
+- **Tiempo aeronave** = de DECOLA a ATERRIZA.
+
+En las listas actuales los eventos están en:
+
+| Evento | Vuelo principal | Cada cambio de batería (sección 7) |
+|---|---|---|
+| PRENDE | 3 · Inicio Motores (M400: Libre Motores 1, 2, 3, 4) | Inicio Motores |
+| DECOLA | 4 · Ascenso | Vuelo Estacionario |
+| ATERRIZA | 6 · Call Outs De Alturas… | «Aterrizaje · Confirmado», que la app agrega sola antes del siguiente cambio de batería o de la parada de motores |
+| APAGA | 8 · Motores Apagados | «Motores · Apagados», que la app agrega sola al empezar cada cambio de batería |
+
+Cada cambio de batería es un vuelo nuevo. La evidencia muestra una tabla con las cuatro horas de cada vuelo, sus tiempos y el total. Si un evento se marca N/A, no se toma su hora.
 
 3. Agregue el nombre del archivo en `listas/indice.txt`, uno por línea.
 4. Si la aeronave es de otro fabricante, ponga su logo en `img/` (PNG) y escriba la ruta en `logo:`.

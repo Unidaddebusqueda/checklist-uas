@@ -1,6 +1,6 @@
 /* Service worker: guarda la app y las listas en el equipo para usarlas sin internet.
    Cuando cambie algún archivo, suba el número de CACHE para que los equipos se actualicen. */
-const CACHE = "checklist-uas-v9";
+const CACHE = "checklist-uas-v10";
 const BASE = ["./", "index.html", "styles.css", "app.js", "manifest.webmanifest",
   "datos/divipola.json", "datos/flota.json", "datos/pilotos.enc.json", "vendor/xlsx.full.min.js",
   "img/logo-ubpd.png", "img/logo-dji.png", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png",
