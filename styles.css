@@ -221,3 +221,9 @@ span.evb{cursor:default;min-height:30px}
 .eventos-fuera .tiempos td:first-child{grid-column:1/-1;background:#f4f1fc;font-weight:bold}
 .eventos-fuera .tiempos td:first-child::before,.eventos-fuera .tiempos td[colspan]::before{content:none}
 .eventos-fuera .tiempos td[colspan]{grid-column:1/-1}
+
+/* Botón al lado del título de la sección (PRENDE, DECOLA, APAGA) */
+.sec-t .evb{min-height:30px;padding:2px 10px;font-size:12px;gap:6px;margin-left:4px}
+.sec-t .evb span{font-size:14px}
+.evb small{font-size:10.5px;font-weight:normal;opacity:.9}
+.sec-t + .hb-reloj{margin-top:0}

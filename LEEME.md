@@ -144,9 +144,9 @@ En las listas actuales los eventos están en:
 
 Cada cambio de batería es un vuelo nuevo. La evidencia muestra una tabla con las cuatro horas de cada vuelo, sus tiempos y el total. Si un evento se marca N/A, no se toma su hora.
 
-**Desde la versión 2.0.0** (listas nuevas): las horas se registran con los botones PRENDE (amarillo), DECOLA (verde), ATERRIZA (azul) y APAGA (rojo), que van fuera del cuadro de su sección (`| boton=…`). En la sección de cambio de batería solo se pregunta ¿Se realiza? Sí / No:
+**Desde la versión 2.0.0** (listas nuevas): las horas se registran con los botones PRENDE (amarillo), DECOLA (verde), ATERRIZA (azul) y APAGA (rojo), que van en su sección (`| boton=…`): PRENDE, DECOLA y APAGA al lado del título de las secciones 2, 4 y 8; ATERRIZA debajo del cuadro de Descenso. En la sección de cambio de batería solo se pregunta ¿Se realiza? Sí / No:
 
-- **Sí:** el vuelo que termina queda con APAGA = ATERRIZA, se cierra, y la lista vuelve a la sección 2 como Vuelo 2 (PRENDE va después de la sección 2).
+- **Sí:** el vuelo que termina queda con APAGA = ATERRIZA, se cierra, y la lista vuelve a la sección 2 como Vuelo 2.
 - **No:** sigue con Parada de motores; el APAGA del último vuelo se marca con su botón.
 
 3. Agregue el nombre del archivo en `listas/indice.txt`, uno por línea.

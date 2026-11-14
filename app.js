@@ -3,7 +3,7 @@
    Los registros se guardan en el dispositivo (IndexedDB) y se exportan como evidencia. */
 "use strict";
 
-const APP_VERSION = "2.0.0";
+const APP_VERSION = "2.1.0";
 const MAX_CICLOS = 8;
 const MAX_FOTOS = 4;
 const ENTIDAD = { nombre: "Unidad de Búsqueda de Personas Dadas por Desaparecidas", sigla: "UBPD", logo: "img/logo-ubpd.png" };
@@ -489,9 +489,10 @@ function botonesDeGrupo(rec, g) {
   if (!plantillaConEventos(rec)) return [];
   if (rec.modo === "rondas") {
     if (g.sec.repetible) return []; // la pregunta de cambio de batería no lleva botones
-    const ronda = g.ronda || 1, b = (g.sec.boton || BOTON_POR_SECCION[g.sec.id] || "").toLowerCase();
-    if (ronda > 1 && g.sec === rec.plantilla.secciones[1]) return [{ vi: ronda - 1, ev: "prende" }]; // vuelo 2+: PRENDE después de la sección 2
-    if (!b || (b === "prende" && ronda > 1)) return [];
+    const ronda = g.ronda || 1, b = (g.sec.boton || "").toLowerCase(), secs = rec.plantilla.secciones;
+    // Listas de la versión 2.0.0 tenían PRENDE en la sección 1: en el vuelo 2+ va en la sección 2.
+    if (secs[0].boton === "PRENDE" && ronda > 1 && g.sec === secs[1]) return [{ vi: ronda - 1, ev: "prende" }];
+    if (!b) return [];
     if (b === "apaga") return [{ vi: rondasDe(rec) - 1, ev: "apaga" }]; // parada de motores: último vuelo
     return [{ vi: ronda - 1, ev: b }];
   }
@@ -501,18 +502,20 @@ function botonesDeGrupo(rec, g) {
   const b = g.sec.boton || (!rec.plantilla.secciones.some(s => s.boton) && BOTON_POR_SECCION[g.sec.id]);
   return b ? [{ vi: 0, ev: b.toLowerCase() }] : [];
 }
+/* Un botón de evento con su color y su hora (en la evidencia, solo la hora). */
+function botonEvento(T, { vi, ev }, interactiva, conVuelo) {
+  const hora = T.vuelos[vi]?.[ev], sel = interactiva && S.relojEv && S.relojEv.vi === vi && S.relojEv.ev === ev;
+  const cont = `${interactiva ? "🕐 " : ""}${ev.toUpperCase()}${conVuelo && vi > 0 ? ` <small>vuelo ${vi + 1}</small>` : ""}<span>${hora ? fmtHM(hora) : "—:—"}</span>`;
+  return interactiva
+    ? `<button type="button" class="evb evb-${ev}${hora ? " lleno" : ""}${sel ? " sel" : ""}" data-a="hora-evento" data-vi="${vi}" data-ev="${ev}">${cont}</button>`
+    : `<span class="evb evb-${ev}">${cont}</span>`;
+}
 /* Botones de evento fuera del cuadro, con su color (o, en la evidencia, solo la hora). */
 function bloqueBotones(rec, lista, interactiva, ciclo) {
   if (!lista.length) return "";
   const T = tiemposVuelo(rec);
   const abierto = interactiva && S.relojEv && lista.find(x => x.vi === S.relojEv.vi && x.ev === S.relojEv.ev);
-  const botones = lista.map(({ vi, ev }) => {
-    const hora = T.vuelos[vi]?.[ev], sel = abierto && abierto.vi === vi && abierto.ev === ev;
-    const cont = `${interactiva ? "🕐 " : ""}${ev.toUpperCase()}<span>${hora ? fmtHM(hora) : "—:—"}</span>`;
-    return interactiva
-      ? `<button type="button" class="evb evb-${ev}${hora ? " lleno" : ""}${sel ? " sel" : ""}" data-a="hora-evento" data-vi="${vi}" data-ev="${ev}">${cont}</button>`
-      : `<span class="evb evb-${ev}">${cont}</span>`;
-  }).join("");
+  const botones = lista.map(x => botonEvento(T, x, interactiva, false)).join("");
   const titulo = ciclo ? `<div class="evb-tit">Vuelo ${ciclo + 1} · cambio de batería ${ciclo}</div>` : (lista.length === 1 && lista[0].vi > 0 ? `<div class="evb-tit">Vuelo ${lista[0].vi + 1}</div>` : "");
   const reloj = abierto ? relojItem(abierto.vi, abierto.ev, T.vuelos[abierto.vi]?.[abierto.ev]) : "";
   // Al registrar APAGA se ven los tiempos completos.
@@ -564,7 +567,18 @@ function hojaSecciones(rec, interactiva) {
     }
     body += items.map(p => filaItem(rec, p, p.key === nextKey, cerrada)).join("");
     const st = items.length ? `${hechos}/${items.length}` : "";
-    return `<section class="sec ${g.gk === curG && !cerrada ? "cur" : ""}"><div class="sec-t ${g.sec.rojo ? "rojo" : ""}"><span class="n">${esc(g.sec.id)}</span>–<span class="t">${esc(titulo)}</span><span class="st">${st}</span></div><div class="box">${body}</div>${bloqueBotones(rec, botonesDeGrupo(rec, g), !cerrada, g.sec.repetible && rec.modo !== "rondas" ? g.ciclo : 0)}${!cerrada && rec.modo === "rondas" && g.sec.repetible && d?.r === "si" ? `<div class="eventos-fuera">${bloqueTiempos(rec)}</div>` : ""}</section>`;
+    // Botones: en el modo por vuelos, PRENDE, DECOLA y APAGA van al lado del título; ATERRIZA, debajo del cuadro.
+    const lista = botonesDeGrupo(rec, g), alLado = rec.modo === "rondas" ? lista.filter(x => x.ev !== "aterriza") : [];
+    const debajo = lista.filter(x => !alLado.includes(x));
+    let enTitulo = "", relojTitulo = "", tiemposTitulo = "";
+    if (alLado.length) {
+      const T = tiemposVuelo(rec), interactiva = !cerrada;
+      enTitulo = alLado.map(x => botonEvento(T, x, interactiva, g.ronda === 1 || !g.ronda)).join("");
+      const ab = interactiva && S.relojEv && alLado.find(x => x.vi === S.relojEv.vi && x.ev === S.relojEv.ev);
+      if (ab) relojTitulo = relojItem(ab.vi, ab.ev, T.vuelos[ab.vi]?.[ab.ev]);
+      if (interactiva && alLado.some(x => x.ev === "apaga" && T.vuelos[x.vi]?.apaga)) tiemposTitulo = `<div class="eventos-fuera">${bloqueTiempos(rec)}</div>`;
+    }
+    return `<section class="sec ${g.gk === curG && !cerrada ? "cur" : ""}"><div class="sec-t ${g.sec.rojo ? "rojo" : ""}"><span class="n">${esc(g.sec.id)}</span>–<span class="t">${esc(titulo)}</span>${enTitulo}<span class="st">${st}</span></div>${relojTitulo}<div class="box">${body}</div>${tiemposTitulo}${bloqueBotones(rec, debajo, !cerrada, g.sec.repetible && rec.modo !== "rondas" ? g.ciclo : 0)}${!cerrada && rec.modo === "rondas" && g.sec.repetible && d?.r === "si" ? `<div class="eventos-fuera">${bloqueTiempos(rec)}</div>` : ""}</section>`;
   }).join("")}</div>`;
 }
 
