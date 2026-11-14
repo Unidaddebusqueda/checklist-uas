@@ -3,7 +3,7 @@
    Los registros se guardan en el dispositivo (IndexedDB) y se exportan como evidencia. */
 "use strict";
 
-const APP_VERSION = "1.7.0";
+const APP_VERSION = "1.7.1";
 const MAX_CICLOS = 8;
 const MAX_FOTOS = 4;
 const ENTIDAD = { nombre: "Unidad de Búsqueda de Personas Dadas por Desaparecidas", sigla: "UBPD", logo: "img/logo-ubpd.png" };
@@ -141,7 +141,9 @@ function tiemposVuelo(rec) {
     const v = vuelos[vuelos.length - 1];
     if (!v[ev]) v[ev] = r.h || r.t; // r.h: hora elegida en el reloj
   }
-  const seg = (a, b) => a && b ? Math.max(0, Math.round((new Date(b) - new Date(a)) / 1000)) : null;
+  // Se restan las horas tal como se ven (HH:MM): 19:52 → 19:53 = 00:01, sin importar los segundos.
+  const minuto = iso => Math.floor(new Date(iso).getTime() / 60000);
+  const seg = (a, b) => a && b ? Math.max(0, (minuto(b) - minuto(a)) * 60) : null;
   let trip = 0, aero = 0;
   for (const v of vuelos) {
     v.tripulacion = seg(v.prende, v.apaga); v.aeronave = seg(v.decola, v.aterriza);
@@ -481,6 +483,9 @@ function hojaSecciones(rec, interactiva) {
   }).join("")}</div>`;
 }
 
+function avisoVersionHTML() {
+  return `<div class="banner info row" style="margin:0 0 10px;justify-content:space-between"><span>Hay una versión nueva de la app. Actualice: la lista no se pierde y se retoma en el mismo paso.</span><button class="pri" data-a="actualizar">Actualizar ahora</button></div>`;
+}
 function vRun() {
   const rec = S.cur, L = rec.plantilla, P = progreso(rec), cerrada = rec.estado === "cerrada";
   const pct = Math.round(P.done / P.total * 100);
@@ -497,11 +502,12 @@ function vRun() {
   return `<div class="sheet">
     <div class="topbar noprint"><div class="info"><b>${esc(L.meta.corto)} · ${esc(rec.matricula || rec.serial)}</b> — OV ${esc(ordenTxt(rec))}<br>${esc(rec.piloto)} · inicio ${fmtT(rec.inicio)} · ${P.done}/${P.total}<div class="bar"><i style="width:${pct}%"></i></div></div>
       <span id="crono" class="crono" hidden></span>${P.next ? `<button data-a="ir">Ir al paso actual</button>` : ""}<button data-a="home">Salir</button></div>
+    <div id="avisoVersion" class="noprint">${S.swWaiting ? avisoVersionHTML() : ""}</div>
     <div id="alertaPaso" class="alerta-paso noprint" hidden role="alert"></div>
     ${header(L, rec.revision)}<div class="acft">${esc(L.meta.aeronave)}</div>
     ${hojaSecciones(rec, true)}
     ${cierre}
-    <p class="foot">${esc(L.meta.elaboro || "")}${L.meta.elaboro ? "<br>" : ""}${esc(ENTIDAD.nombre)}</p></div>`;
+    <p class="foot">${esc(L.meta.elaboro || "")}${L.meta.elaboro ? "<br>" : ""}${esc(ENTIDAD.nombre)} · v${APP_VERSION}</p></div>`;
 }
 
 function datosVuelo(rec) {
@@ -756,7 +762,11 @@ document.addEventListener("click", async ev => {
   else if (a === "borrar") { S.confirmBorrar = id; render(); }
   else if (a === "borrar-no") { S.confirmBorrar = null; render(); }
   else if (a === "borrar-si") { await IDB.del(id); S.recs = S.recs.filter(r => r.id !== id); S.confirmBorrar = null; render(); toast("Lista descartada."); }
-  else if (a === "actualizar") { S.swWaiting?.postMessage("skipWaiting"); }
+  else if (a === "actualizar") {
+    // Si hay una lista abierta, se retoma sola después de recargar (ya está guardada en el equipo).
+    if (S.cur) { try { sessionStorage.setItem("uas_reanudar", S.cur.id); } catch (e) { } }
+    if (S.swWaiting) S.swWaiting.postMessage("skipWaiting"); else location.reload();
+  }
 });
 
 document.addEventListener("input", ev => {
@@ -830,15 +840,26 @@ window.addEventListener("offline", () => S.view === "home" && render());
     const bp = basePilotos(), clave = lsGet("uas_clave_base", null);
     if (clave && bp?.origen === "cifrada" && bp.generado !== S.baseCifrada.generado) await desbloquearBase(clave).catch(() => { });
   } catch (e) { S.baseCifrada = null; }
-  render();
+  let reanudar = null; try { reanudar = sessionStorage.getItem("uas_reanudar"); sessionStorage.removeItem("uas_reanudar"); } catch (e) { }
+  const abierta = reanudar && S.recs.find(r => r.id === reanudar && r.estado !== "cerrada");
+  if (abierta) { S.cur = JSON.parse(JSON.stringify(abierta)); S.view = "run"; render(); setTimeout(irAlPaso, 80); toast("App actualizada a la versión " + APP_VERSION + ". Continúe la lista.", 4000); }
+  else render();
   if ("serviceWorker" in navigator && location.protocol !== "file:") {
     try {
       const reg = await navigator.serviceWorker.register("sw.js");
-      const avisar = w => { if (w && navigator.serviceWorker.controller) { S.swWaiting = w; if (S.view === "home") render(); } };
+      const avisar = w => {
+        if (!w || !navigator.serviceWorker.controller) return;
+        S.swWaiting = w;
+        if (S.view === "home") render();
+        else { const av = $("#avisoVersion"); if (av) av.innerHTML = avisoVersionHTML(); } // sin redibujar la lista
+      };
       avisar(reg.waiting);
       reg.addEventListener("updatefound", () => { const w = reg.installing; w?.addEventListener("statechange", () => w.state === "installed" && avisar(w)); });
       let recargado = false;
-      navigator.serviceWorker.addEventListener("controllerchange", () => { if (!recargado && !S.cur) { recargado = true; location.reload(); } });
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        let reanudar = false; try { reanudar = !!sessionStorage.getItem("uas_reanudar"); } catch (e) { }
+        if (!recargado && (!S.cur || reanudar)) { recargado = true; location.reload(); }
+      });
       setInterval(() => reg.update().catch(() => { }), 30 * 60 * 1000);
     } catch (e) { /* sin modo offline */ }
   }
