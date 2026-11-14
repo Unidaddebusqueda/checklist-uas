@@ -3,7 +3,7 @@
    Los registros se guardan en el dispositivo (IndexedDB) y se exportan como evidencia. */
 "use strict";
 
-const APP_VERSION = "1.7.1";
+const APP_VERSION = "1.8.0";
 const MAX_CICLOS = 8;
 const MAX_FOTOS = 4;
 const ENTIDAD = { nombre: "Unidad de Búsqueda de Personas Dadas por Desaparecidas", sigla: "UBPD", logo: "img/logo-ubpd.png" };
@@ -130,17 +130,27 @@ function pasos(rec) {
   return out;
 }
 
-/* Vuelos del registro con sus cuatro horas y los tiempos de tripulación y aeronave (en segundos). */
+/* Vuelos del registro con sus cuatro horas y los tiempos de tripulación y aeronave (en segundos).
+   Las horas salen de la barra de botones (rec.horas, una entrada por vuelo); si un evento no se
+   registró en la barra, se usa la hora en que se marcó su ítem en la lista. */
 function tiemposVuelo(rec) {
-  const vuelos = [];
+  const vuelos = [], porPaso = {};
+  let idx = -1;
   for (const p of pasos(rec)) {
     if (p.kind !== "item" || !evDe(p.it)) continue;
-    const r = rec.resp[p.key]; if (!r || r.r === "na") continue;
     const ev = evDe(p.it).toLowerCase();
-    if (ev === "prende" || !vuelos.length) vuelos.push({});
-    const v = vuelos[vuelos.length - 1];
-    if (!v[ev]) v[ev] = r.h || r.t; // r.h: hora elegida en el reloj
+    if (ev === "prende" || idx < 0) idx++; // cada ítem PRENDE de la lista empieza un vuelo
+    porPaso[p.key] = idx;
+    const v = (vuelos[idx] ||= {});
+    const r = rec.resp[p.key];
+    if (r && r.r !== "na" && !v[ev]) v[ev] = r.h || r.t; // r.h: hora elegida en el reloj (versión 1.7.0)
   }
+  (rec.horas || []).forEach((h, i) => {
+    const v = (vuelos[i] ||= {});
+    for (const ev of ["prende", "decola", "aterriza", "apaga"]) if (h?.[ev]) v[ev] = h[ev];
+  });
+  for (let i = 0; i < vuelos.length; i++) vuelos[i] ||= {};
+  while (vuelos.length && !Object.keys(vuelos[vuelos.length - 1]).length) vuelos.pop(); // vuelos aún sin horas
   // Se restan las horas tal como se ven (HH:MM): 19:52 → 19:53 = 00:01, sin importar los segundos.
   const minuto = iso => Math.floor(new Date(iso).getTime() / 60000);
   const seg = (a, b) => a && b ? Math.max(0, (minuto(b) - minuto(a)) * 60) : null;
@@ -150,8 +160,9 @@ function tiemposVuelo(rec) {
     // El total suma los minutos ya redondeados de cada vuelo, para que cuadre con la tabla.
     trip += Math.round((v.tripulacion || 0) / 60) * 60; aero += Math.round((v.aeronave || 0) / 60) * 60;
   }
-  return { vuelos, tripulacion: trip, aeronave: aero };
+  return { vuelos, tripulacion: trip, aeronave: aero, porPaso };
 }
+const minutoDe = iso => Math.floor(new Date(iso).getTime() / 60000);
 const plantillaConEventos = rec => rec.plantilla.secciones.some(s => s.items.some(it => evDe(it)));
 function progreso(rec) { const st = pasos(rec); return { st, done: st.filter(x => rec.resp[x.key]).length, total: st.length, next: st.find(x => !rec.resp[x.key]) }; }
 const nNov = rec => Object.values(rec.resp).filter(r => r.r === "nov").length;
@@ -418,28 +429,69 @@ function initNuevo() {
 
 function filaItem(rec, p, isNext, cerrada) {
   const r = rec.resp[p.key]; const it = p.it;
-  const cls = ["it", it.rojo ? "rojo" : "", it.neg ? "neg" : "", r ? "s-" + r.r : "", isNext && !cerrada ? "act" : "", !r && !isNext ? "lock" : ""].join(" ");
+  const cls = ["it", it.rojo ? "rojo" : "", it.neg ? "neg" : "", r ? "s-" + r.r : "", isNext && !cerrada ? "act" : "", !r && !isNext ? (evDe(it) && !cerrada ? "lock-ev" : "lock") : ""].join(" ");
   let extra = "";
   const ev = evDe(it);
   const ajustada = r && r.h && Math.abs(new Date(r.h) - new Date(r.t)) >= 60000;
   if (r) extra = `<div class="meta"><span class="t">${fmtT(r.t)}</span><span class="res-${r.r}">${RES[r.r][0]}</span>${ajustada ? `<span class="small">hora del evento ${fmtHM(r.h)}</span>` : ""}${r.n ? `<span class="nota">${esc(r.n)}</span>` : ""}${!cerrada && rec._ult === p.key ? `<button class="lnk noprint" data-a="corregir" data-k="${p.key}">Corregir</button>` : ""}</div>`;
-  else if (isNext && !cerrada) extra = (ev ? relojEvento(p.key, ev) : "") + (S.noteFor === p.key
+  else if (isNext && !cerrada) extra = S.noteFor === p.key
     ? `<div class="note"><label for="nota"><span>Describa la novedad y la acción tomada</span><textarea id="nota"></textarea></label><div class="row"><button class="warn" data-a="nov-ok" data-k="${p.key}">Registrar novedad</button><button data-a="nov-no">Cancelar</button></div></div>`
-    : `<div class="acts"><button class="ok" data-a="res" data-r="ok" data-k="${p.key}">✓ CUMPLE</button><button data-a="res" data-r="na" data-k="${p.key}">N/A</button><button class="warn" data-a="nov" data-k="${p.key}">NOVEDAD</button></div>`);
-  // Etiqueta del evento en su propia línea, para que no apriete el nombre del ítem en el celular.
-  const evt = ev ? `<div class="evt-l"><span class="evt evt-${ev.toLowerCase()}">${ev}${r && r.r !== "na" ? " " + fmtHM(r.h || r.t) : ""}</span></div>` : "";
+    : `<div class="acts"><button class="ok" data-a="res" data-r="ok" data-k="${p.key}">✓ CUMPLE</button><button data-a="res" data-r="na" data-k="${p.key}">N/A</button><button class="warn" data-a="nov" data-k="${p.key}">NOVEDAD</button></div>`;
+  // Etiqueta del evento en su propia línea, con la hora del vuelo (la de la barra, o la del ítem).
+  // Botón del evento en su fase: siempre visible y activo mientras la lista está abierta.
+  let evt = "", mostrarTiempos = false;
+  if (ev) {
+    const T = tiemposVuelo(rec), vi = T.porPaso[p.key] ?? 0, e = ev.toLowerCase(), horaEv = T.vuelos[vi]?.[e] || null;
+    mostrarTiempos = e === "apaga" && !!horaEv && !cerrada; // al registrar APAGA se ven los tiempos completos
+    if (cerrada) evt = `<div class="evt-l"><span class="evt evt-${e}">${ev}${horaEv ? " " + fmtHM(horaEv) : ""}</span></div>`;
+    else {
+      const abierto = S.relojEv?.key === p.key;
+      evt = `<div class="evt-l"><button type="button" class="hb hb-${e}${horaEv ? " lleno" : ""}${abierto ? " sel" : ""}" data-a="hora-item" data-k="${p.key}" data-vi="${vi}" data-ev="${e}">🕐 ${ev}<span>${horaEv ? fmtHM(horaEv) : "—:—"}</span></button>${horaEv ? "" : `<span class="small muted">Toque para registrar la hora</span>`}</div>`
+        + (abierto ? relojItem(p.key, vi, e, horaEv) : "");
+    }
+  }
   // Al registrar APAGA se muestran los tiempos completos (solo mientras se ejecuta la lista).
-  const tiempos = ev === "APAGA" && r && r.r !== "na" && !cerrada ? bloqueTiempos(rec) : "";
+  const tiempos = mostrarTiempos ? bloqueTiempos(rec) : "";
   return `<div class="${cls}${it.auto ? " auto" : ""}" id="k_${p.key.replace(/\./g, "_")}"><div class="ln"><span class="nm">${esc(it.n)}</span><span class="dots"></span><span class="val">${esc(valDe(it))}</span><span class="mk">${r ? RES[r.r][2] : ""}</span></div>${evt}${extra}${tiempos}</div>`;
 }
 
 /* ---------------- reloj para la hora de los eventos de vuelo ---------------- */
 const pad2 = n => String(n).padStart(2, "0");
 const horaActual = () => { const d = new Date(); return pad2(d.getHours()) + ":" + pad2(d.getMinutes()); };
-function relojEvento(key, ev) {
-  const v = S.horaSel?.k === key ? S.horaSel.v : horaActual();
-  return `<div class="reloj noprint"><label for="horaEv"><span>Hora de ${ev}</span><input type="time" id="horaEv" data-k="${key}" value="${v}"></label>
-    <button type="button" class="pri" data-a="hora-reloj">🕐 Elegir hora</button><button type="button" data-a="hora-ahora" data-k="${key}">Ahora</button></div>`;
+const EVS = ["prende", "decola", "aterriza", "apaga"];
+/* Reloj que se abre debajo del botón del evento. */
+function relojItem(key, vi, ev, hora) {
+  return `<div class="hb-reloj noprint"><label for="relojBarra"><span>Hora de ${ev.toUpperCase()}${vi > 0 ? ` · vuelo ${vi + 1}` : ""}</span><input type="time" id="relojBarra" value="${hora ? fmtHM(hora) : horaActual()}"></label>
+    <button type="button" class="pri" data-a="hora-guardar">Guardar</button><button type="button" data-a="hora-ya">Ahora</button><button type="button" data-a="hora-cancelar">Cancelar</button></div>`;
+}
+/* Vuelve a dibujar solo los ítems de eventos (y la tabla del cierre), sin redibujar la lista:
+   así no se pierden la firma ni las observaciones del cierre. */
+function refrescarEventos() {
+  const rec = S.cur; if (!rec) return;
+  const P = progreso(rec);
+  for (const p of P.st) {
+    if (p.kind !== "item" || !evDe(p.it)) continue;
+    const el = document.getElementById("k_" + p.key.replace(/\./g, "_"));
+    if (el) el.outerHTML = filaItem(rec, p, P.next?.key === p.key, rec.estado === "cerrada");
+  }
+  const tc = $("#cierre .tiempos"); if (tc) tc.outerHTML = bloqueTiempos(rec);
+}
+/* Guarda la hora elegida para un evento del vuelo vi, en orden y sin horas futuras. */
+async function guardarHoraBarra(vi, ev, valor) {
+  const rec = S.cur, d = horaAFecha(valor), E = ev.toUpperCase();
+  if (!d) { toast(`Seleccione la hora de ${E}.`); return false; }
+  if (d - Date.now() > 60000) { toast(`La hora de ${E} (${valor}) no puede ser posterior a la hora actual.`, 4500); return false; }
+  const T = tiemposVuelo(rec), v = T.vuelos[vi] || {}, k = EVS.indexOf(ev);
+  if (k > 0 && !v[EVS[k - 1]]) { toast(`Primero registre ${EVS[k - 1].toUpperCase()} del vuelo ${vi + 1}.`, 4000); return false; }
+  const antes = k > 0 ? { ev: EVS[k - 1], t: v[EVS[k - 1]] } : (T.vuelos[vi - 1]?.apaga ? { ev: `APAGA del vuelo ${vi}`, t: T.vuelos[vi - 1].apaga } : null);
+  const despues = k < 3 ? (v[EVS[k + 1]] ? { ev: EVS[k + 1], t: v[EVS[k + 1]] } : null) : (T.vuelos[vi + 1]?.prende ? { ev: `PRENDE del vuelo ${vi + 2}`, t: T.vuelos[vi + 1].prende } : null);
+  if (antes && minutoDe(d) < minutoDe(antes.t)) { toast(`La hora de ${E} (${valor}) no puede ser anterior a ${antes.ev.toUpperCase()} (${fmtHM(antes.t)}).`, 5000); return false; }
+  if (despues && minutoDe(d) > minutoDe(despues.t)) { toast(`La hora de ${E} (${valor}) no puede ser posterior a ${despues.ev.toUpperCase()} (${fmtHM(despues.t)}).`, 5000); return false; }
+  rec.horas ||= []; while (rec.horas.length <= vi) rec.horas.push({});
+  rec.horas[vi][ev] = d.toISOString();
+  log(rec, "hora-evento", { vuelo: vi + 1, evento: E, hora: rec.horas[vi][ev] });
+  await guardar(rec);
+  return true;
 }
 /* "HH:MM" elegido → fecha completa. Si queda más de una hora en el futuro, es de ayer (vuelo cerca de medianoche). */
 function horaAFecha(hhmm) {
@@ -447,16 +499,6 @@ function horaAFecha(hhmm) {
   const ahora = new Date(), d = new Date(ahora); d.setHours(h, m, 0, 0);
   if (d - ahora > 60 * 60 * 1000) d.setDate(d.getDate() - 1);
   return d;
-}
-/* Último evento ya registrado antes del paso indicado (para no aceptar horas fuera de orden). */
-function eventoAnterior(rec, key) {
-  let prev = null;
-  for (const p of pasos(rec)) {
-    if (p.key === key) break;
-    const r = rec.resp[p.key], e = p.kind === "item" && evDe(p.it);
-    if (e && r && r.r !== "na") prev = { ev: e, t: r.h || r.t };
-  }
-  return prev;
 }
 
 function grupos(st) {
@@ -659,7 +701,9 @@ const mmss = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 setInterval(async () => {
   const c = $("#crono"), al = $("#alertaPaso");
   if (S.view !== "run" || !S.cur || !c) { document.body.classList.remove("en-alerta"); return; }
-  const e = S.noteFor ? null : estadoCrono(S.cur); // mientras escribe una novedad no se cuenta
+  // La alerta queda justo debajo de la barra superior (su alto cambia con la barra de horas).
+  const tb = document.querySelector(".topbar"); if (tb) document.documentElement.style.setProperty("--alto-topbar", tb.offsetHeight + "px");
+  const e = S.noteFor || S.relojEv ? null : estadoCrono(S.cur); // mientras escribe una novedad no se cuenta
   document.querySelectorAll(".it.pendiente").forEach(x => { if (!e || e.seg < LIMITE_SEG) x.classList.remove("pendiente"); });
   if (!e) { c.hidden = true; al.hidden = true; document.body.classList.remove("en-alerta"); return; }
   const tarde = e.seg >= LIMITE_SEG;
@@ -688,30 +732,17 @@ async function responder(key, r, n) {
   const rec = S.cur; if (rec.estado === "cerrada") return;
   const paso = progreso(rec).next;
   if (paso?.key !== key) return; // obliga el orden
-  // Eventos de vuelo: la hora es la que el piloto deja en el reloj (por defecto, la actual).
-  const ev = paso.kind === "item" && evDe(paso.it);
-  let h = null;
-  if (ev && r !== "na") {
-    const valor = $("#horaEv")?.value || (S.horaSel?.k === key ? S.horaSel.v : horaActual());
-    const d = horaAFecha(valor);
-    if (!d) { toast(`Seleccione la hora de ${ev}.`); $("#horaEv")?.focus(); return; }
-    if (d - Date.now() > 60000) { toast(`La hora de ${ev} (${valor}) no puede ser posterior a la hora actual.`, 4500); return; }
-    const prev = eventoAnterior(rec, key);
-    if (prev && d < new Date(prev.t).setSeconds(0, 0)) { toast(`La hora de ${ev} (${valor}) no puede ser anterior a ${prev.ev} (${fmtHM(prev.t)}).`, 5000); return; }
-    h = d.toISOString();
-  }
   const t = nowIso();
-  rec.resp[key] = { r, t, ...(h ? { h } : {}), ...(n ? { n } : {}) }; rec._ult = key; S.noteFor = null; S.horaSel = null;
-  if (h && Math.abs(new Date(h) - new Date(t)) >= 60000) log(rec, "hora-evento", { paso: key, evento: ev, hora: h });
+  rec.resp[key] = { r, t, ...(n ? { n } : {}) }; rec._ult = key; S.noteFor = null;
   render(); await guardar(rec); setTimeout(irAlPaso, 40);
 }
 
 document.addEventListener("click", async ev => {
   const b = ev.target.closest("[data-a]"); if (!b) return;
   const a = b.dataset.a, id = b.dataset.id;
-  if (a === "home") { mantenerPantalla(false); S.view = "home"; S.cur = null; S.confirmBorrar = null; render(); scrollTo(0, 0); }
+  if (a === "home") { mantenerPantalla(false); S.view = "home"; S.cur = null; S.relojEv = null; S.confirmBorrar = null; render(); scrollTo(0, 0); }
   else if (a === "nueva") { S.listaId = b.dataset.l; S.view = "nuevo"; render(); scrollTo(0, 0); }
-  else if (a === "continuar") { const r = S.recs.find(x => x.id === id); if (!r) return; S.cur = JSON.parse(JSON.stringify(r)); S.view = "run"; render(); setTimeout(irAlPaso, 60); }
+  else if (a === "continuar") { const r = S.recs.find(x => x.id === id); if (!r) return; S.cur = JSON.parse(JSON.stringify(r)); S.relojEv = null; S.view = "run"; render(); setTimeout(irAlPaso, 60); }
   else if (a === "ver") { S.verId = id; S.view = "ver"; render(); scrollTo(0, 0); }
   else if (a === "ir") irAlPaso();
   else if (a === "silenciar") { const e = S.cur && estadoCrono(S.cur); if (e) { S._silencioDe = e.ult; silenciar(); const al = $("#alertaPaso"); al._html = null; } }
@@ -723,8 +754,20 @@ document.addEventListener("click", async ev => {
   }
   else if (a === "buscar-cc") { const sfx = b.dataset.sfx || ""; mostrarPiloto(sfx); if (!S["pilotoSel" + sfx] && basePilotos() && soloDig($("#cedula" + sfx).value)) toast("Cédula no encontrada en la base de pilotos."); }
   else if (a === "res" || a === "dec") responder(b.dataset.k, b.dataset.r);
-  else if (a === "hora-reloj") { const i = $("#horaEv"); if (!i) return; i.focus(); try { i.showPicker(); } catch (e) { i.click(); } }
-  else if (a === "hora-ahora") { const i = $("#horaEv"); if (i) { i.value = horaActual(); S.horaSel = { k: b.dataset.k, v: i.value }; } }
+  else if (a === "hora-item") { // botón del evento dentro de su fase: abre el reloj del equipo
+    prepararAudio();
+    S.relojEv = S.relojEv?.key === b.dataset.k ? null : { key: b.dataset.k, vi: +b.dataset.vi, ev: b.dataset.ev };
+    refrescarEventos();
+    const i = $("#relojBarra"); if (i) { i.focus(); try { i.showPicker(); } catch (e) { } }
+  }
+  else if (a === "hora-ya") { const i = $("#relojBarra"); if (i) i.value = horaActual(); }
+  else if (a === "hora-cancelar") { S.relojEv = null; refrescarEventos(); }
+  else if (a === "hora-guardar") {
+    const R = S.relojEv; if (!R || !S.cur) return;
+    if (!(await guardarHoraBarra(R.vi, R.ev, $("#relojBarra")?.value))) return;
+    S.relojEv = null; refrescarEventos();
+    toast(`${R.ev.toUpperCase()} registrado: ${fmtHM(tiemposVuelo(S.cur).vuelos[R.vi]?.[R.ev])}`);
+  }
   else if (a === "nov") { S.noteFor = b.dataset.k; render(); const t = $("#nota"); t?.focus(); }
   else if (a === "nov-no") { S.noteFor = null; render(); irAlPaso(); }
   else if (a === "nov-ok") { const n = $("#nota").value.trim(); if (!n) { toast("Escriba la novedad antes de registrarla."); $("#nota").focus(); return; } responder(b.dataset.k, "nov", n); }
@@ -771,7 +814,6 @@ document.addEventListener("click", async ev => {
 
 document.addEventListener("input", ev => {
   if (ev.target.id === "cedula" || ev.target.id === "cedula2") { const sfx = ev.target.id === "cedula2" ? "2" : ""; clearTimeout(S["_ccT" + sfx]); S["_ccT" + sfx] = setTimeout(() => mostrarPiloto(sfx), 350); }
-  if (ev.target.id === "horaEv") S.horaSel = { k: ev.target.dataset.k, v: ev.target.value }; // se conserva si abre NOVEDAD
   if (ev.target.id === "filtro") { S.filtro = ev.target.value; const pos = ev.target.selectionStart; render(); const f = $("#filtro"); f.focus(); f.setSelectionRange(pos, pos); }
 });
 
