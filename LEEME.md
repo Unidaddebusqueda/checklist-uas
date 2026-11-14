@@ -120,7 +120,8 @@ Batería Dron | Reemplazada
 | `== N \| TÍTULO \| rojo` | Título de sección resaltado en rojo |
 | `== N \| TÍTULO \| repetible` | Sección que se puede repetir (pregunta «¿Se realiza?») |
 | `Ítem \| Valor esperado` | Ítem normal |
-| `Ítem \| Valor \| PRENDE` | Ítem que registra la **hora** de un evento de vuelo: `PRENDE`, `DECOLA`, `ATERRIZA` o `APAGA` |
+| `Ítem \| Valor \| PRENDE` | Ítem que corresponde a un evento de vuelo: `PRENDE`, `DECOLA`, `ATERRIZA` o `APAGA` |
+| `== N \| TÍTULO \| boton=PRENDE` | Después del cuadro de esa sección va el botón de hora del evento (PRENDE amarillo, DECOLA verde, ATERRIZA azul, APAGA rojo) |
 | `!Ítem \| Valor` | Ítem en rojo (inspección de componente principal) |
 | `*Ítem \| Valor` | Ítem en negrilla |
 | `# texto` | Comentario (se ignora) |

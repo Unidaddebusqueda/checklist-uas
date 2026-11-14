@@ -3,7 +3,7 @@
    Los registros se guardan en el dispositivo (IndexedDB) y se exportan como evidencia. */
 "use strict";
 
-const APP_VERSION = "1.8.0";
+const APP_VERSION = "1.9.0";
 const MAX_CICLOS = 8;
 const MAX_FOTOS = 4;
 const ENTIDAD = { nombre: "Unidad de Búsqueda de Personas Dadas por Desaparecidas", sigla: "UBPD", logo: "img/logo-ubpd.png" };
@@ -54,7 +54,8 @@ function parseLista(txt, archivo) {
     const line = raw.trim(); if (!line || line.startsWith("#")) continue;
     if (line.startsWith("==")) {
       const parts = line.slice(2).split("|").map(s => s.trim()); const flags = parts.slice(2).map(s => s.toLowerCase());
-      sec = { id: parts[0], t: parts[1] || "", repetible: flags.includes("repetible"), rojo: flags.includes("rojo"), items: [] };
+      const bt = (flags.find(f => f.startsWith("boton=")) || "").slice(6).trim().toUpperCase();
+      sec = { id: parts[0], t: parts[1] || "", repetible: flags.includes("repetible"), rojo: flags.includes("rojo"), items: [], ...(EVENTOS.includes(bt) ? { boton: bt } : {}) };
       L.secciones.push(sec); continue;
     }
     if (!sec) { const m = line.match(/^([A-Za-zÁÉÍÓÚáéíóúÑñ_]+)\s*:\s*(.*)$/); if (m) L.meta[m[1].toLowerCase()] = m[2].trim(); continue; }
@@ -145,10 +146,10 @@ function tiemposVuelo(rec) {
     const r = rec.resp[p.key];
     if (r && r.r !== "na" && !v[ev]) v[ev] = r.h || r.t; // r.h: hora elegida en el reloj (versión 1.7.0)
   }
-  (rec.horas || []).forEach((h, i) => {
-    const v = (vuelos[i] ||= {});
-    for (const ev of ["prende", "decola", "aterriza", "apaga"]) if (h?.[ev]) v[ev] = h[ev];
-  });
+  if (rec.horas?.length) { // horas registradas con los botones: son las que valen
+    vuelos.length = 0;
+    rec.horas.forEach((h, i) => { const v = (vuelos[i] = {}); for (const ev of ["prende", "decola", "aterriza", "apaga"]) if (h?.[ev]) v[ev] = h[ev]; });
+  }
   for (let i = 0; i < vuelos.length; i++) vuelos[i] ||= {};
   while (vuelos.length && !Object.keys(vuelos[vuelos.length - 1]).length) vuelos.pop(); // vuelos aún sin horas
   // Se restan las horas tal como se ven (HH:MM): 19:52 → 19:53 = 00:01, sin importar los segundos.
@@ -429,30 +430,14 @@ function initNuevo() {
 
 function filaItem(rec, p, isNext, cerrada) {
   const r = rec.resp[p.key]; const it = p.it;
-  const cls = ["it", it.rojo ? "rojo" : "", it.neg ? "neg" : "", r ? "s-" + r.r : "", isNext && !cerrada ? "act" : "", !r && !isNext ? (evDe(it) && !cerrada ? "lock-ev" : "lock") : ""].join(" ");
+  const cls = ["it", it.rojo ? "rojo" : "", it.neg ? "neg" : "", r ? "s-" + r.r : "", isNext && !cerrada ? "act" : "", !r && !isNext ? "lock" : ""].join(" ");
   let extra = "";
-  const ev = evDe(it);
   const ajustada = r && r.h && Math.abs(new Date(r.h) - new Date(r.t)) >= 60000;
   if (r) extra = `<div class="meta"><span class="t">${fmtT(r.t)}</span><span class="res-${r.r}">${RES[r.r][0]}</span>${ajustada ? `<span class="small">hora del evento ${fmtHM(r.h)}</span>` : ""}${r.n ? `<span class="nota">${esc(r.n)}</span>` : ""}${!cerrada && rec._ult === p.key ? `<button class="lnk noprint" data-a="corregir" data-k="${p.key}">Corregir</button>` : ""}</div>`;
   else if (isNext && !cerrada) extra = S.noteFor === p.key
     ? `<div class="note"><label for="nota"><span>Describa la novedad y la acción tomada</span><textarea id="nota"></textarea></label><div class="row"><button class="warn" data-a="nov-ok" data-k="${p.key}">Registrar novedad</button><button data-a="nov-no">Cancelar</button></div></div>`
     : `<div class="acts"><button class="ok" data-a="res" data-r="ok" data-k="${p.key}">✓ CUMPLE</button><button data-a="res" data-r="na" data-k="${p.key}">N/A</button><button class="warn" data-a="nov" data-k="${p.key}">NOVEDAD</button></div>`;
-  // Etiqueta del evento en su propia línea, con la hora del vuelo (la de la barra, o la del ítem).
-  // Botón del evento en su fase: siempre visible y activo mientras la lista está abierta.
-  let evt = "", mostrarTiempos = false;
-  if (ev) {
-    const T = tiemposVuelo(rec), vi = T.porPaso[p.key] ?? 0, e = ev.toLowerCase(), horaEv = T.vuelos[vi]?.[e] || null;
-    mostrarTiempos = e === "apaga" && !!horaEv && !cerrada; // al registrar APAGA se ven los tiempos completos
-    if (cerrada) evt = `<div class="evt-l"><span class="evt evt-${e}">${ev}${horaEv ? " " + fmtHM(horaEv) : ""}</span></div>`;
-    else {
-      const abierto = S.relojEv?.key === p.key;
-      evt = `<div class="evt-l"><button type="button" class="hb hb-${e}${horaEv ? " lleno" : ""}${abierto ? " sel" : ""}" data-a="hora-item" data-k="${p.key}" data-vi="${vi}" data-ev="${e}">🕐 ${ev}<span>${horaEv ? fmtHM(horaEv) : "—:—"}</span></button>${horaEv ? "" : `<span class="small muted">Toque para registrar la hora</span>`}</div>`
-        + (abierto ? relojItem(p.key, vi, e, horaEv) : "");
-    }
-  }
-  // Al registrar APAGA se muestran los tiempos completos (solo mientras se ejecuta la lista).
-  const tiempos = mostrarTiempos ? bloqueTiempos(rec) : "";
-  return `<div class="${cls}${it.auto ? " auto" : ""}" id="k_${p.key.replace(/\./g, "_")}"><div class="ln"><span class="nm">${esc(it.n)}</span><span class="dots"></span><span class="val">${esc(valDe(it))}</span><span class="mk">${r ? RES[r.r][2] : ""}</span></div>${evt}${extra}${tiempos}</div>`;
+  return `<div class="${cls}${it.auto ? " auto" : ""}" id="k_${p.key.replace(/\./g, "_")}"><div class="ln"><span class="nm">${esc(it.n)}</span><span class="dots"></span><span class="val">${esc(valDe(it))}</span><span class="mk">${r ? RES[r.r][2] : ""}</span></div>${extra}</div>`;
 }
 
 /* ---------------- reloj para la hora de los eventos de vuelo ---------------- */
@@ -460,21 +445,44 @@ const pad2 = n => String(n).padStart(2, "0");
 const horaActual = () => { const d = new Date(); return pad2(d.getHours()) + ":" + pad2(d.getMinutes()); };
 const EVS = ["prende", "decola", "aterriza", "apaga"];
 /* Reloj que se abre debajo del botón del evento. */
-function relojItem(key, vi, ev, hora) {
+function relojItem(vi, ev, hora) {
   return `<div class="hb-reloj noprint"><label for="relojBarra"><span>Hora de ${ev.toUpperCase()}${vi > 0 ? ` · vuelo ${vi + 1}` : ""}</span><input type="time" id="relojBarra" value="${hora ? fmtHM(hora) : horaActual()}"></label>
     <button type="button" class="pri" data-a="hora-guardar">Guardar</button><button type="button" data-a="hora-ya">Ahora</button><button type="button" data-a="hora-cancelar">Cancelar</button></div>`;
 }
-/* Vuelve a dibujar solo los ítems de eventos (y la tabla del cierre), sin redibujar la lista:
+/* Vuelve a dibujar la hoja (secciones y botones) y la tabla del cierre, sin redibujar el resto:
    así no se pierden la firma ni las observaciones del cierre. */
 function refrescarEventos() {
   const rec = S.cur; if (!rec) return;
-  const P = progreso(rec);
-  for (const p of P.st) {
-    if (p.kind !== "item" || !evDe(p.it)) continue;
-    const el = document.getElementById("k_" + p.key.replace(/\./g, "_"));
-    if (el) el.outerHTML = filaItem(rec, p, P.next?.key === p.key, rec.estado === "cerrada");
-  }
+  const cols = document.querySelector(".cols"); if (cols) cols.outerHTML = hojaSecciones(rec, true);
   const tc = $("#cierre .tiempos"); if (tc) tc.outerHTML = bloqueTiempos(rec);
+}
+/* Sección después de la cual va cada botón. Por defecto: 1 → PRENDE, 4 → DECOLA, 6 → ATERRIZA, 8 → APAGA. */
+const BOTON_POR_SECCION = { "1": "PRENDE", "4": "DECOLA", "6": "ATERRIZA", "8": "APAGA" };
+function botonesDeGrupo(rec, g) {
+  if (!plantillaConEventos(rec)) return [];
+  if (g.sec.repetible && tieneEvento(g.sec, "PRENDE")) { // cada cambio de batería es otro vuelo: sus 4 botones juntos
+    return rec.resp[`${g.sec.id}d${g.ciclo}`]?.r === "si" ? EVS.map(ev => ({ vi: g.ciclo, ev })) : [];
+  }
+  const b = g.sec.boton || (!rec.plantilla.secciones.some(s => s.boton) && BOTON_POR_SECCION[g.sec.id]);
+  return b ? [{ vi: 0, ev: b.toLowerCase() }] : [];
+}
+/* Botones de evento fuera del cuadro, con su color (o, en la evidencia, solo la hora). */
+function bloqueBotones(rec, lista, interactiva, ciclo) {
+  if (!lista.length) return "";
+  const T = tiemposVuelo(rec);
+  const abierto = interactiva && S.relojEv && lista.find(x => x.vi === S.relojEv.vi && x.ev === S.relojEv.ev);
+  const botones = lista.map(({ vi, ev }) => {
+    const hora = T.vuelos[vi]?.[ev], sel = abierto && abierto.vi === vi && abierto.ev === ev;
+    const cont = `${interactiva ? "🕐 " : ""}${ev.toUpperCase()}<span>${hora ? fmtHM(hora) : "—:—"}</span>`;
+    return interactiva
+      ? `<button type="button" class="evb evb-${ev}${hora ? " lleno" : ""}${sel ? " sel" : ""}" data-a="hora-evento" data-vi="${vi}" data-ev="${ev}">${cont}</button>`
+      : `<span class="evb evb-${ev}">${cont}</span>`;
+  }).join("");
+  const titulo = ciclo ? `<div class="evb-tit">Vuelo ${ciclo + 1} · cambio de batería ${ciclo}</div>` : "";
+  const reloj = abierto ? relojItem(abierto.vi, abierto.ev, T.vuelos[abierto.vi]?.[abierto.ev]) : "";
+  // Al registrar APAGA se ven los tiempos completos.
+  const tiempos = interactiva && lista.some(x => x.ev === "apaga" && T.vuelos[x.vi]?.apaga) ? bloqueTiempos(rec) : "";
+  return `<div class="eventos-fuera">${titulo}<div class="evb-fila">${botones}</div>${reloj}${tiempos}</div>`;
 }
 /* Guarda la hora elegida para un evento del vuelo vi, en orden y sin horas futuras. */
 async function guardarHoraBarra(vi, ev, valor) {
@@ -521,10 +529,27 @@ function hojaSecciones(rec, interactiva) {
     }
     body += items.map(p => filaItem(rec, p, p.key === nextKey, cerrada)).join("");
     const st = items.length ? `${hechos}/${items.length}` : "";
-    return `<section class="sec ${g.gk === curG && !cerrada ? "cur" : ""}"><div class="sec-t ${g.sec.rojo ? "rojo" : ""}"><span class="n">${esc(g.sec.id)}</span>–<span class="t">${esc(titulo)}</span><span class="st">${st}</span></div><div class="box">${body}</div></section>`;
+    return `<section class="sec ${g.gk === curG && !cerrada ? "cur" : ""}"><div class="sec-t ${g.sec.rojo ? "rojo" : ""}"><span class="n">${esc(g.sec.id)}</span>–<span class="t">${esc(titulo)}</span><span class="st">${st}</span></div><div class="box">${body}</div>${bloqueBotones(rec, botonesDeGrupo(rec, g), !cerrada, g.sec.repetible ? g.ciclo : 0)}</section>`;
   }).join("")}</div>`;
 }
 
+/* Compara la versión que corre con la publicada. Si el equipo quedó con una copia vieja
+   (por ejemplo, instalada con archivos de la memoria temporal), borra la copia y recarga.
+   Se intenta una sola vez por versión para no entrar en un ciclo. */
+async function comprobarVersion(reg) {
+  try {
+    const txt = await (await fetch("app.js?comprobar=" + Date.now(), { cache: "no-store" })).text();
+    const pub = txt.match(/const APP_VERSION = "([\d.]+)"/)?.[1];
+    if (!pub || pub === APP_VERSION) return;
+    let intentada = null; try { intentada = sessionStorage.getItem("uas_version_intentada"); } catch (e) { }
+    if (intentada === pub) { S.swWaiting = S.swWaiting || reg?.waiting || reg?.active || { postMessage() { location.reload(); } }; return; }
+    if (S.view === "nuevo" || (S.cur && $("#cierre"))) return; // no interrumpir el formulario ni el cierre; se corrige la próxima vez
+    try { sessionStorage.setItem("uas_version_intentada", pub); if (S.cur) sessionStorage.setItem("uas_reanudar", S.cur.id); } catch (e) { }
+    for (const k of await caches.keys()) await caches.delete(k);
+    await reg?.update().catch(() => { });
+    location.reload();
+  } catch (e) { /* sin internet: se revisa en la próxima apertura */ }
+}
 function avisoVersionHTML() {
   return `<div class="banner info row" style="margin:0 0 10px;justify-content:space-between"><span>Hay una versión nueva de la app. Actualice: la lista no se pierde y se retoma en el mismo paso.</span><button class="pri" data-a="actualizar">Actualizar ahora</button></div>`;
 }
@@ -754,9 +779,10 @@ document.addEventListener("click", async ev => {
   }
   else if (a === "buscar-cc") { const sfx = b.dataset.sfx || ""; mostrarPiloto(sfx); if (!S["pilotoSel" + sfx] && basePilotos() && soloDig($("#cedula" + sfx).value)) toast("Cédula no encontrada en la base de pilotos."); }
   else if (a === "res" || a === "dec") responder(b.dataset.k, b.dataset.r);
-  else if (a === "hora-item") { // botón del evento dentro de su fase: abre el reloj del equipo
+  else if (a === "hora-evento") { // botón del evento: abre el reloj del equipo debajo del botón
     prepararAudio();
-    S.relojEv = S.relojEv?.key === b.dataset.k ? null : { key: b.dataset.k, vi: +b.dataset.vi, ev: b.dataset.ev };
+    const vi = +b.dataset.vi, ev = b.dataset.ev;
+    S.relojEv = S.relojEv && S.relojEv.vi === vi && S.relojEv.ev === ev ? null : { vi, ev };
     refrescarEventos();
     const i = $("#relojBarra"); if (i) { i.focus(); try { i.showPicker(); } catch (e) { } }
   }
@@ -898,11 +924,22 @@ window.addEventListener("offline", () => S.view === "home" && render());
       avisar(reg.waiting);
       reg.addEventListener("updatefound", () => { const w = reg.installing; w?.addEventListener("statechange", () => w.state === "installed" && avisar(w)); });
       let recargado = false;
+      // La versión nueva se activa sola: se recarga la app y, si había una lista abierta, se retoma.
+      // Solo se espera si el piloto está en el cierre (para no perder la firma ni las observaciones).
+      // En la primera instalación no hay versión anterior: no se recarga.
+      const habiaVersion = !!navigator.serviceWorker.controller;
       navigator.serviceWorker.addEventListener("controllerchange", () => {
-        let reanudar = false; try { reanudar = !!sessionStorage.getItem("uas_reanudar"); } catch (e) { }
-        if (!recargado && (!S.cur || reanudar)) { recargado = true; location.reload(); }
+        if (recargado || !habiaVersion) return;
+        // No interrumpir el formulario de datos del vuelo ni el cierre: queda el aviso para actualizar.
+        if (S.view === "nuevo" || (S.cur && $("#cierre"))) { S.swWaiting = { postMessage() { location.reload(); } }; const av = $("#avisoVersion"); if (av) av.innerHTML = avisoVersionHTML(); return; }
+        recargado = true;
+        if (S.cur) { try { sessionStorage.setItem("uas_reanudar", S.cur.id); } catch (e) { } }
+        location.reload();
       });
-      setInterval(() => reg.update().catch(() => { }), 30 * 60 * 1000);
+      const buscar = () => { if (navigator.onLine) { reg.update().catch(() => { }); comprobarVersion(reg); } };
+      buscar();
+      document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") buscar(); });
+      setInterval(buscar, 30 * 60 * 1000);
     } catch (e) { /* sin modo offline */ }
   }
 })();

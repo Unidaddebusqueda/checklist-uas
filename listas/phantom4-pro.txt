@@ -8,7 +8,7 @@ logo: img/logo-dji.png
 revision: REV. 1.1 ENE-2026
 elaboro: ING. Manuel Farid Medina
 
-== 1 | INSPECCIÓN INICIAL
+== 1 | INSPECCIÓN INICIAL | boton=PRENDE
 !Control RC | Requerido/Inspección
 Antenas | Desplegadas
 Pantalla Celular/Tablet | Puesta/Conectada
@@ -53,7 +53,7 @@ Controles De Vuelo | Modo 2/Normal
 % De Batería Dron | >75% Confirmado
 % De Batería Control RC | >75%/Confirmado
 
-== 4 | DESPEGUE | rojo
+== 4 | DESPEGUE | rojo | boton=DECOLA
 Comunicaciones Requeridas | Establecida
 Autorización Despegue | Recibida
 Ascenso | Ajustado | DECOLA
@@ -69,7 +69,7 @@ Parámetros (GPS, Señal RC, % Baterías, Altitud, Distancia) | Chequeo/Cruzado
 Vuelo Terminado | RTH/ON
 Regreso Modo Manual | Requerido/SÍ. NO
 
-== 6 | DESCENSO | rojo
+== 6 | DESCENSO | rojo | boton=ATERRIZA
 Comunicaciones | Establecidas
 RTH | Iniciado/Armado
 Baterías Dron/RC | >30% Verificada
@@ -93,7 +93,7 @@ Vuelo Estacionario | 1 Metro/Ajustado | DECOLA
 Datos Para Continuar Misión | Confirmados
 !Lista Chequeo En Despegue | Seguir
 
-== 8 | PARADA DE MOTORES
+== 8 | PARADA DE MOTORES | boton=APAGA
 Comunicaciones | Establecida
 Información Guardada | Confirmada
 Motores | Apagados | APAGA
