@@ -195,15 +195,15 @@ body.en-alerta .sec.cur .box{box-shadow:0 0 0 4px #ff1a1a}
 .eventos-fuera{margin:8px 0 2px;break-inside:avoid}
 .evb-tit{font-weight:bold;font-size:13px;margin:0 0 4px}
 .evb-fila{display:flex;flex-wrap:wrap;gap:8px}
-.evb{display:inline-flex;align-items:center;justify-content:center;gap:10px;flex:1 1 150px;min-height:52px;padding:6px 14px;border:2px solid rgba(0,0,0,.35);border-radius:8px;font-weight:bold;font-size:15px;letter-spacing:.3px;cursor:pointer;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.evb span{font-family:var(--mono);font-size:19px}
+.evb{display:inline-flex;align-items:center;justify-content:center;gap:8px;flex:0 0 auto;min-height:36px;padding:4px 12px;border:1.5px solid rgba(0,0,0,.35);border-radius:6px;font-weight:bold;font-size:13px;letter-spacing:.2px;cursor:pointer;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.evb span{font-family:var(--mono);font-size:15px}
 .evb-prende{background:#ffe600;color:#000}
 .evb-decola{background:#1e8a3c;color:#fff}
 .evb-aterriza{background:#1f5fbf;color:#fff}
 .evb-apaga{background:#d62828;color:#fff}
 .evb:not(.lleno) span{opacity:.75}
 .evb.sel{box-shadow:0 0 0 4px #13294b}
-span.evb{cursor:default;min-height:40px}
+span.evb{cursor:default;min-height:30px}
 .hb-reloj{display:flex;flex-wrap:wrap;gap:6px;align-items:flex-end;margin:8px 0 4px;padding:10px;background:#f4f1fc;border:1.5px solid #534ab7;border-radius:6px}
 .hb-reloj label{flex:1 1 160px;margin:0}
 .hb-reloj label span{display:block;font-size:12px;font-weight:bold;color:#3c3489}

@@ -3,7 +3,7 @@
    Los registros se guardan en el dispositivo (IndexedDB) y se exportan como evidencia. */
 "use strict";
 
-const APP_VERSION = "1.9.0";
+const APP_VERSION = "2.0.0";
 const MAX_CICLOS = 8;
 const MAX_FOTOS = 4;
 const ENTIDAD = { nombre: "Unidad de Búsqueda de Personas Dadas por Desaparecidas", sigla: "UBPD", logo: "img/logo-ubpd.png" };
@@ -103,7 +103,34 @@ const evDe = it => it.ev || (String(it.v || "").match(RE_EVENTO)?.[1].toUpperCas
 const valDe = it => String(it.v || "").replace(RE_EVENTO, "");
 const tieneEvento = (s, ev) => s.items.some(it => evDe(it) === ev);
 
+/* Listas nuevas (modo "rondas"): cada cambio de batería es otro vuelo y la lista vuelve a la
+   sección 2 (Antes de rotación de hélices). La sección de cambio de batería queda solo como la
+   pregunta ¿Sí / No?. Al terminar (No), sigue con Parada de motores y el resto. */
+function pasosRondas(rec) {
+  const secs = rec.plantilla.secciones, out = [];
+  const iRep = secs.findIndex(x => x.repetible && tieneEvento(x, "PRENDE"));
+  const agregar = (desde, hasta, ronda) => {
+    for (let k = desde; k < hasta; k++) {
+      const sec = secs[k];
+      sec.items.forEach((it, i) => out.push({ kind: "item", key: ronda > 1 ? `${sec.id}r${ronda}.${i}` : `${sec.id}.${i}`, sec, it, ronda }));
+    }
+  };
+  if (iRep < 0) { agregar(0, secs.length, 1); return out; }
+  const rep = secs[iRep];
+  agregar(0, iRep, 1);
+  for (let c = 1; c <= MAX_CICLOS; c++) {
+    const dk = `${rep.id}d${c}`; out.push({ kind: "dec", key: dk, sec: rep, ciclo: c });
+    if (rec.resp[dk]?.r !== "si") break;
+    agregar(1, iRep, c + 1); // vuelo c + 1: desde la sección 2
+  }
+  agregar(iRep + 1, secs.length, 1);
+  return out;
+}
+const rondasDe = rec => 1 + Object.entries(rec.resp).filter(([k, v]) => /d\d+$/.test(k) && v.r === "si").length;
+const gkDe = p => p.sec.id + (p.ciclo ? "#" + p.ciclo : "") + (p.ronda > 1 ? "#v" + p.ronda : "");
+
 function pasos(rec) {
+  if (rec.modo === "rondas") return pasosRondas(rec);
   const out = [];
   const conEventos = rec.plantilla.secciones.some(s => s.items.some(it => evDe(it)));
   let ciclosVuelo = 0;
@@ -460,6 +487,14 @@ function refrescarEventos() {
 const BOTON_POR_SECCION = { "1": "PRENDE", "4": "DECOLA", "6": "ATERRIZA", "8": "APAGA" };
 function botonesDeGrupo(rec, g) {
   if (!plantillaConEventos(rec)) return [];
+  if (rec.modo === "rondas") {
+    if (g.sec.repetible) return []; // la pregunta de cambio de batería no lleva botones
+    const ronda = g.ronda || 1, b = (g.sec.boton || BOTON_POR_SECCION[g.sec.id] || "").toLowerCase();
+    if (ronda > 1 && g.sec === rec.plantilla.secciones[1]) return [{ vi: ronda - 1, ev: "prende" }]; // vuelo 2+: PRENDE después de la sección 2
+    if (!b || (b === "prende" && ronda > 1)) return [];
+    if (b === "apaga") return [{ vi: rondasDe(rec) - 1, ev: "apaga" }]; // parada de motores: último vuelo
+    return [{ vi: ronda - 1, ev: b }];
+  }
   if (g.sec.repetible && tieneEvento(g.sec, "PRENDE")) { // cada cambio de batería es otro vuelo: sus 4 botones juntos
     return rec.resp[`${g.sec.id}d${g.ciclo}`]?.r === "si" ? EVS.map(ev => ({ vi: g.ciclo, ev })) : [];
   }
@@ -478,7 +513,7 @@ function bloqueBotones(rec, lista, interactiva, ciclo) {
       ? `<button type="button" class="evb evb-${ev}${hora ? " lleno" : ""}${sel ? " sel" : ""}" data-a="hora-evento" data-vi="${vi}" data-ev="${ev}">${cont}</button>`
       : `<span class="evb evb-${ev}">${cont}</span>`;
   }).join("");
-  const titulo = ciclo ? `<div class="evb-tit">Vuelo ${ciclo + 1} · cambio de batería ${ciclo}</div>` : "";
+  const titulo = ciclo ? `<div class="evb-tit">Vuelo ${ciclo + 1} · cambio de batería ${ciclo}</div>` : (lista.length === 1 && lista[0].vi > 0 ? `<div class="evb-tit">Vuelo ${lista[0].vi + 1}</div>` : "");
   const reloj = abierto ? relojItem(abierto.vi, abierto.ev, T.vuelos[abierto.vi]?.[abierto.ev]) : "";
   // Al registrar APAGA se ven los tiempos completos.
   const tiempos = interactiva && lista.some(x => x.ev === "apaga" && T.vuelos[x.vi]?.apaga) ? bloqueTiempos(rec) : "";
@@ -510,17 +545,17 @@ function horaAFecha(hhmm) {
 }
 
 function grupos(st) {
-  const g = []; for (const p of st) { const gk = p.sec.id + (p.ciclo ? "#" + p.ciclo : ""); let x = g.find(y => y.gk === gk); if (!x) { x = { gk, sec: p.sec, ciclo: p.ciclo, pasos: [] }; g.push(x); } x.pasos.push(p); } return g;
+  const g = []; for (const p of st) { const gk = gkDe(p); let x = g.find(y => y.gk === gk); if (!x) { x = { gk, sec: p.sec, ciclo: p.ciclo, ronda: p.ronda || 1, pasos: [] }; g.push(x); } x.pasos.push(p); } return g;
 }
 
 function hojaSecciones(rec, interactiva) {
   const P = progreso(rec), cerrada = rec.estado === "cerrada" || !interactiva; const nextKey = P.next?.key;
-  const curG = P.next ? (P.next.sec.id + (P.next.ciclo ? "#" + P.next.ciclo : "")) : null;
+  const curG = P.next ? gkDe(P.next) : null;
   return `<div class="cols">${grupos(P.st).map(g => {
     const items = g.pasos.filter(p => p.kind === "item"), dec = g.pasos.find(p => p.kind === "dec");
     const d = dec && rec.resp[dec.key];
     const hechos = items.filter(p => rec.resp[p.key]).length;
-    const titulo = g.sec.t + (g.sec.repetible && (g.ciclo > 1 || items.length) ? ` · CICLO ${g.ciclo}` : "");
+    const titulo = g.sec.t + (g.sec.repetible && (g.ciclo > 1 || items.length) ? ` · CICLO ${g.ciclo}` : "") + (g.ronda > 1 ? ` · VUELO ${g.ronda}` : "");
     let body = "";
     if (dec) {
       if (!d && dec.key === nextKey && !cerrada) body += `<div class="decide"><b>¿Se realiza ${g.ciclo > 1 ? "otro " : ""}${esc(g.sec.t.toLowerCase())}?</b><div class="row"><button class="pri" data-a="dec" data-r="si" data-k="${dec.key}">Sí, registrar</button><button data-a="dec" data-r="no" data-k="${dec.key}">No, continuar</button></div></div>`;
@@ -529,7 +564,7 @@ function hojaSecciones(rec, interactiva) {
     }
     body += items.map(p => filaItem(rec, p, p.key === nextKey, cerrada)).join("");
     const st = items.length ? `${hechos}/${items.length}` : "";
-    return `<section class="sec ${g.gk === curG && !cerrada ? "cur" : ""}"><div class="sec-t ${g.sec.rojo ? "rojo" : ""}"><span class="n">${esc(g.sec.id)}</span>–<span class="t">${esc(titulo)}</span><span class="st">${st}</span></div><div class="box">${body}</div>${bloqueBotones(rec, botonesDeGrupo(rec, g), !cerrada, g.sec.repetible ? g.ciclo : 0)}</section>`;
+    return `<section class="sec ${g.gk === curG && !cerrada ? "cur" : ""}"><div class="sec-t ${g.sec.rojo ? "rojo" : ""}"><span class="n">${esc(g.sec.id)}</span>–<span class="t">${esc(titulo)}</span><span class="st">${st}</span></div><div class="box">${body}</div>${bloqueBotones(rec, botonesDeGrupo(rec, g), !cerrada, g.sec.repetible && rec.modo !== "rondas" ? g.ciclo : 0)}${!cerrada && rec.modo === "rondas" && g.sec.repetible && d?.r === "si" ? `<div class="eventos-fuera">${bloqueTiempos(rec)}</div>` : ""}</section>`;
   }).join("")}</div>`;
 }
 
@@ -715,7 +750,7 @@ async function mantenerPantalla(on) {
 /* Devuelve la sección empezada y no terminada, con el segundo desde el último paso marcado. */
 function estadoCrono(rec) {
   const P = progreso(rec); if (!P.next || rec.estado === "cerrada") return null;
-  const gk = p => p.sec.id + (p.ciclo ? "#" + p.ciclo : "");
+  const gk = gkDe;
   const grupo = P.st.filter(p => gk(p) === gk(P.next));
   const hechos = grupo.map(p => rec.resp[p.key]).filter(Boolean);
   if (!hechos.length) return null; // la sección no ha empezado: no se cuenta (p. ej. durante el vuelo)
@@ -778,6 +813,19 @@ document.addEventListener("click", async ev => {
     catch (e) { b.disabled = false; b.textContent = "Activar base"; toast("Clave incorrecta. Verifique e intente de nuevo.", 4000); $("#claveBase").select(); }
   }
   else if (a === "buscar-cc") { const sfx = b.dataset.sfx || ""; mostrarPiloto(sfx); if (!S["pilotoSel" + sfx] && basePilotos() && soloDig($("#cedula" + sfx).value)) toast("Cédula no encontrada en la base de pilotos."); }
+  else if (a === "dec" && b.dataset.r === "si" && S.cur?.modo === "rondas") {
+    const rec = S.cur, n = +(b.dataset.k.match(/d(\d+)$/) || [])[1], vi = n - 1;
+    const v = tiemposVuelo(rec).vuelos[vi] || {};
+    if (!v.aterriza) { toast(`Antes del cambio de batería registre la hora de ATERRIZA del vuelo ${vi + 1}.`, 5000); return; }
+    if (!v.apaga) {
+      rec.horas ||= []; while (rec.horas.length <= vi) rec.horas.push({});
+      rec.horas[vi].apaga = v.aterriza; // cambio de batería: se apaga al aterrizar
+      log(rec, "hora-evento", { vuelo: vi + 1, evento: "APAGA", hora: v.aterriza, automatica: "igual a ATERRIZA (cambio de batería)" });
+    }
+    S.relojEv = null;
+    responder(b.dataset.k, "si");
+    toast(`Vuelo ${vi + 1} cerrado. Comienza el vuelo ${vi + 2}: continúe en la sección 2.`, 4500);
+  }
   else if (a === "res" || a === "dec") responder(b.dataset.k, b.dataset.r);
   else if (a === "hora-evento") { // botón del evento: abre el reloj del equipo debajo del botón
     prepararAudio();
@@ -884,7 +932,7 @@ document.addEventListener("submit", async ev => {
     serial: nave.serial, matricula: nave.matricula, ruas: nave.ruas || "", aeronaveManual: !!nave.manual, mantVencido: !!(nave.proxMant6 && nave.proxMant6 < hoyISO()), proxMant6: nave.proxMant6 || "",
     piloto2, ordenVuelo: g("orden"), departamento: g("dpto"), municipio: g("mpio"), lugar: g("lugar"),
     equipo: (navigator.userAgent.match(/\(([^)]+)\)/)?.[1] || "").slice(0, 60),
-    inicio: nowIso(), fin: null, estado: "en_curso", resp: {}, fotos: [], bitacora: []
+    inicio: nowIso(), fin: null, estado: "en_curso", resp: {}, fotos: [], bitacora: [], modo: "rondas"
   };
   log(rec, "inicio");
   S.cur = rec; S.view = "run"; await guardar(rec); render(); scrollTo(0, 0);
