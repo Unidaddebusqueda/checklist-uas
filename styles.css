@@ -179,3 +179,6 @@ body.en-alerta .sec.cur .box{box-shadow:0 0 0 4px #ff1a1a}
   .tiempos td:first-child::before,.tiempos td[colspan]::before{content:none}
   .tiempos td[colspan]{grid-column:1/-1}
 }
+
+/* La alerta tiene display:flex; sin esto el atributo hidden no la oculta y queda una franja roja vacía */
+.alerta-paso[hidden]{display:none}

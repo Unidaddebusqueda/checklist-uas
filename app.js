@@ -3,7 +3,7 @@
    Los registros se guardan en el dispositivo (IndexedDB) y se exportan como evidencia. */
 "use strict";
 
-const APP_VERSION = "1.6.0";
+const APP_VERSION = "1.6.1";
 const MAX_CICLOS = 8;
 const MAX_FOTOS = 4;
 const ENTIDAD = { nombre: "Unidad de Búsqueda de Personas Dadas por Desaparecidas", sigla: "UBPD", logo: "img/logo-ubpd.png" };
@@ -94,11 +94,17 @@ const EVENTOS = ["PRENDE", "DECOLA", "ATERRIZA", "APAGA"];
 // y necesita su propio aterrizaje y apagado (la lista impresa no los trae).
 const ITEM_ATERRIZA = { n: "Aterrizaje", v: "Confirmado", ev: "ATERRIZA", auto: true };
 const ITEM_APAGA = { n: "Motores", v: "Apagados", ev: "APAGA", auto: true };
-const tieneEvento = (s, ev) => s.items.some(it => it.ev === ev);
+// Listas en curso o cerradas que se iniciaron con la app 1.5.0 y las listas nuevas guardaron
+// el evento dentro del valor ("Apagados | APAGA"). Se reconoce sin modificar el registro
+// (así no cambia su código de verificación).
+const RE_EVENTO = /\s*\|\s*(PRENDE|DECOLA|ATERRIZA|APAGA)\s*$/i;
+const evDe = it => it.ev || (String(it.v || "").match(RE_EVENTO)?.[1].toUpperCase() ?? null);
+const valDe = it => String(it.v || "").replace(RE_EVENTO, "");
+const tieneEvento = (s, ev) => s.items.some(it => evDe(it) === ev);
 
 function pasos(rec) {
   const out = [];
-  const conEventos = rec.plantilla.secciones.some(s => s.items.some(it => it.ev));
+  const conEventos = rec.plantilla.secciones.some(s => s.items.some(it => evDe(it)));
   let ciclosVuelo = 0;
   for (const s of rec.plantilla.secciones) {
     if (s.repetible) {
@@ -128,9 +134,9 @@ function pasos(rec) {
 function tiemposVuelo(rec) {
   const vuelos = [];
   for (const p of pasos(rec)) {
-    if (p.kind !== "item" || !p.it.ev) continue;
+    if (p.kind !== "item" || !evDe(p.it)) continue;
     const r = rec.resp[p.key]; if (!r || r.r === "na") continue;
-    const ev = p.it.ev.toLowerCase();
+    const ev = evDe(p.it).toLowerCase();
     if (ev === "prende" || !vuelos.length) vuelos.push({});
     const v = vuelos[vuelos.length - 1];
     if (!v[ev]) v[ev] = r.t;
@@ -144,7 +150,7 @@ function tiemposVuelo(rec) {
   }
   return { vuelos, tripulacion: trip, aeronave: aero };
 }
-const plantillaConEventos = rec => rec.plantilla.secciones.some(s => s.items.some(it => it.ev));
+const plantillaConEventos = rec => rec.plantilla.secciones.some(s => s.items.some(it => evDe(it)));
 function progreso(rec) { const st = pasos(rec); return { st, done: st.filter(x => rec.resp[x.key]).length, total: st.length, next: st.find(x => !rec.resp[x.key]) }; }
 const nNov = rec => Object.values(rec.resp).filter(r => r.r === "nov").length;
 const nCiclos = rec => Object.entries(rec.resp).filter(([k, v]) => /d\d+$/.test(k) && v.r === "si").length;
@@ -417,8 +423,9 @@ function filaItem(rec, p, isNext, cerrada) {
     ? `<div class="note"><label for="nota"><span>Describa la novedad y la acción tomada</span><textarea id="nota"></textarea></label><div class="row"><button class="warn" data-a="nov-ok" data-k="${p.key}">Registrar novedad</button><button data-a="nov-no">Cancelar</button></div></div>`
     : `<div class="acts"><button class="ok" data-a="res" data-r="ok" data-k="${p.key}">✓ CUMPLE</button><button data-a="res" data-r="na" data-k="${p.key}">N/A</button><button class="warn" data-a="nov" data-k="${p.key}">NOVEDAD</button></div>`;
   // Etiqueta del evento en su propia línea, para que no apriete el nombre del ítem en el celular.
-  const evt = it.ev ? `<div class="evt-l"><span class="evt evt-${it.ev.toLowerCase()}">${it.ev}${r && r.r !== "na" ? " " + fmtHM(r.t) : ""}</span></div>` : "";
-  return `<div class="${cls}${it.auto ? " auto" : ""}" id="k_${p.key.replace(/\./g, "_")}"><div class="ln"><span class="nm">${esc(it.n)}</span><span class="dots"></span><span class="val">${esc(it.v)}</span><span class="mk">${r ? RES[r.r][2] : ""}</span></div>${evt}${extra}</div>`;
+  const ev = evDe(it);
+  const evt = ev ? `<div class="evt-l"><span class="evt evt-${ev.toLowerCase()}">${ev}${r && r.r !== "na" ? " " + fmtHM(r.t) : ""}</span></div>` : "";
+  return `<div class="${cls}${it.auto ? " auto" : ""}" id="k_${p.key.replace(/\./g, "_")}"><div class="ln"><span class="nm">${esc(it.n)}</span><span class="dots"></span><span class="val">${esc(valDe(it))}</span><span class="mk">${r ? RES[r.r][2] : ""}</span></div>${evt}${extra}</div>`;
 }
 
 function grupos(st) {
