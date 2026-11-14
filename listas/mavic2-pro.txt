@@ -42,7 +42,6 @@ Estado Sensores IMU, Brújula | Normal
 Vuelo Automático | Cargado/Ajustado
 
 == 3 | ROTACIÓN DE HÉLICES | rojo
-Toma De Tiempo Inicio | Chequeado
 Área De Vuelo | Libre/Despejada
 !Dron Puerto | Instalado/Asegurado
 Inicio Motores | Rotación/Confirmada | PRENDE
@@ -97,7 +96,6 @@ Hélices | Detenidas
 Batería Dron | Apagada
 Confirmación Datos Guardados | Chequeado
 Control RC | Apagado
-Toma De Tiempo | Chequeado
 
 == 9 | POS-VUELO
 Hélices | Removidas

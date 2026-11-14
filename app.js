@@ -3,7 +3,7 @@
    Los registros se guardan en el dispositivo (IndexedDB) y se exportan como evidencia. */
 "use strict";
 
-const APP_VERSION = "2.1.0";
+const APP_VERSION = "2.2.0";
 const MAX_CICLOS = 8;
 const MAX_FOTOS = 4;
 const ENTIDAD = { nombre: "Unidad de Búsqueda de Personas Dadas por Desaparecidas", sigla: "UBPD", logo: "img/logo-ubpd.png" };
@@ -607,13 +607,13 @@ function vRun() {
   const pct = Math.round(P.done / P.total * 100);
   const cierre = !P.next && !cerrada ? `<div class="panel navy" id="cierre"><h2>Cierre y firma del registro</h2>
     <div class="grid-kv"><div><b>Pasos</b>${P.done}/${P.total}</div><div><b>Novedades</b>${nNov(rec)}</div><div><b>Duración</b>${dur(rec.inicio, nowIso())}</div></div>
-    ${bloqueTiempos(rec)}
     <label for="obs"><span>Observaciones generales (opcional)</span><textarea id="obs">${esc(rec.observaciones || "")}</textarea></label>
     <div><b class="small">Fotos de evidencia (opcional, hasta ${MAX_FOTOS})</b>
       <div class="fotos" style="margin:6px 0">${(rec.fotos || []).map((f, i) => `<figure><img src="${f.data}" alt="Foto ${i + 1}"><figcaption>${fmtT(f.t)} · <button class="lnk" data-a="foto-del" data-i="${i}">Quitar</button></figcaption></figure>`).join("")}</div>
       ${(rec.fotos || []).length < MAX_FOTOS ? `<label class="small" style="font-weight:normal"><span>Tomar o elegir foto</span><input type="file" id="foto" accept="image/*" capture="environment"></label>` : ""}</div>
     <div><b class="small">Firma del piloto</b><canvas id="firma" class="sig" aria-label="Espacio para firmar con el dedo"></canvas><button class="lnk" data-a="firma-borrar">Borrar firma</button></div>
     <label class="chk" for="decl"><input type="checkbox" id="decl"><span>Declaro que esta lista de chequeo fue ejecutada en campo, ítem por ítem y en el orden establecido, por el piloto <b>${esc(rec.piloto)}</b>.</span></label>
+    ${bloqueTiempos(rec)}
     <div class="row"><button class="pri" data-a="cerrar">Cerrar y firmar registro</button></div></div>` : "";
   return `<div class="sheet">
     <div class="topbar noprint"><div class="info"><b>${esc(L.meta.corto)} · ${esc(rec.matricula || rec.serial)}</b> — OV ${esc(ordenTxt(rec))}<br>${esc(rec.piloto)} · inicio ${fmtT(rec.inicio)} · ${P.done}/${P.total}<div class="bar"><i style="width:${pct}%"></i></div></div>
@@ -668,9 +668,9 @@ function vVer(rec) {
       <button data-a="json" data-id="${esc(rec.id)}">Archivo de verificación</button>${rec.hash ? `<button data-a="integridad" data-id="${esc(rec.id)}">Verificar integridad</button>` : ""}</div></div>
     ${header(L, rec.revision)}<div class="acft">${esc(L.meta.aeronave)} · EVIDENCIA DE EJECUCIÓN</div>
     ${datosVuelo(rec)}
-    ${bloqueTiempos(rec)}
     ${hojaSecciones(rec, false)}
     ${bloqueEvidencia(rec)}
+    ${bloqueTiempos(rec)}
     <p class="foot">${esc(L.meta.elaboro || "")}${L.meta.elaboro ? " · " : ""}${esc(ENTIDAD.nombre)} · Generado con Listas de Chequeo UAS v${esc(rec.appVersion || APP_VERSION)}</p></div>`;
 }
 
