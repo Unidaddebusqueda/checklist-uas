@@ -3,7 +3,7 @@
    Los registros se guardan en el dispositivo (IndexedDB) y se exportan como evidencia. */
 "use strict";
 
-const APP_VERSION = "1.6.1";
+const APP_VERSION = "1.7.0";
 const MAX_CICLOS = 8;
 const MAX_FOTOS = 4;
 const ENTIDAD = { nombre: "Unidad de Búsqueda de Personas Dadas por Desaparecidas", sigla: "UBPD", logo: "img/logo-ubpd.png" };
@@ -139,7 +139,7 @@ function tiemposVuelo(rec) {
     const ev = evDe(p.it).toLowerCase();
     if (ev === "prende" || !vuelos.length) vuelos.push({});
     const v = vuelos[vuelos.length - 1];
-    if (!v[ev]) v[ev] = r.t;
+    if (!v[ev]) v[ev] = r.h || r.t; // r.h: hora elegida en el reloj
   }
   const seg = (a, b) => a && b ? Math.max(0, Math.round((new Date(b) - new Date(a)) / 1000)) : null;
   let trip = 0, aero = 0;
@@ -418,14 +418,43 @@ function filaItem(rec, p, isNext, cerrada) {
   const r = rec.resp[p.key]; const it = p.it;
   const cls = ["it", it.rojo ? "rojo" : "", it.neg ? "neg" : "", r ? "s-" + r.r : "", isNext && !cerrada ? "act" : "", !r && !isNext ? "lock" : ""].join(" ");
   let extra = "";
-  if (r) extra = `<div class="meta"><span class="t">${fmtT(r.t)}</span><span class="res-${r.r}">${RES[r.r][0]}</span>${r.n ? `<span class="nota">${esc(r.n)}</span>` : ""}${!cerrada && rec._ult === p.key ? `<button class="lnk noprint" data-a="corregir" data-k="${p.key}">Corregir</button>` : ""}</div>`;
-  else if (isNext && !cerrada) extra = S.noteFor === p.key
-    ? `<div class="note"><label for="nota"><span>Describa la novedad y la acción tomada</span><textarea id="nota"></textarea></label><div class="row"><button class="warn" data-a="nov-ok" data-k="${p.key}">Registrar novedad</button><button data-a="nov-no">Cancelar</button></div></div>`
-    : `<div class="acts"><button class="ok" data-a="res" data-r="ok" data-k="${p.key}">✓ CUMPLE</button><button data-a="res" data-r="na" data-k="${p.key}">N/A</button><button class="warn" data-a="nov" data-k="${p.key}">NOVEDAD</button></div>`;
-  // Etiqueta del evento en su propia línea, para que no apriete el nombre del ítem en el celular.
   const ev = evDe(it);
-  const evt = ev ? `<div class="evt-l"><span class="evt evt-${ev.toLowerCase()}">${ev}${r && r.r !== "na" ? " " + fmtHM(r.t) : ""}</span></div>` : "";
-  return `<div class="${cls}${it.auto ? " auto" : ""}" id="k_${p.key.replace(/\./g, "_")}"><div class="ln"><span class="nm">${esc(it.n)}</span><span class="dots"></span><span class="val">${esc(valDe(it))}</span><span class="mk">${r ? RES[r.r][2] : ""}</span></div>${evt}${extra}</div>`;
+  const ajustada = r && r.h && Math.abs(new Date(r.h) - new Date(r.t)) >= 60000;
+  if (r) extra = `<div class="meta"><span class="t">${fmtT(r.t)}</span><span class="res-${r.r}">${RES[r.r][0]}</span>${ajustada ? `<span class="small">hora del evento ${fmtHM(r.h)}</span>` : ""}${r.n ? `<span class="nota">${esc(r.n)}</span>` : ""}${!cerrada && rec._ult === p.key ? `<button class="lnk noprint" data-a="corregir" data-k="${p.key}">Corregir</button>` : ""}</div>`;
+  else if (isNext && !cerrada) extra = (ev ? relojEvento(p.key, ev) : "") + (S.noteFor === p.key
+    ? `<div class="note"><label for="nota"><span>Describa la novedad y la acción tomada</span><textarea id="nota"></textarea></label><div class="row"><button class="warn" data-a="nov-ok" data-k="${p.key}">Registrar novedad</button><button data-a="nov-no">Cancelar</button></div></div>`
+    : `<div class="acts"><button class="ok" data-a="res" data-r="ok" data-k="${p.key}">✓ CUMPLE</button><button data-a="res" data-r="na" data-k="${p.key}">N/A</button><button class="warn" data-a="nov" data-k="${p.key}">NOVEDAD</button></div>`);
+  // Etiqueta del evento en su propia línea, para que no apriete el nombre del ítem en el celular.
+  const evt = ev ? `<div class="evt-l"><span class="evt evt-${ev.toLowerCase()}">${ev}${r && r.r !== "na" ? " " + fmtHM(r.h || r.t) : ""}</span></div>` : "";
+  // Al registrar APAGA se muestran los tiempos completos (solo mientras se ejecuta la lista).
+  const tiempos = ev === "APAGA" && r && r.r !== "na" && !cerrada ? bloqueTiempos(rec) : "";
+  return `<div class="${cls}${it.auto ? " auto" : ""}" id="k_${p.key.replace(/\./g, "_")}"><div class="ln"><span class="nm">${esc(it.n)}</span><span class="dots"></span><span class="val">${esc(valDe(it))}</span><span class="mk">${r ? RES[r.r][2] : ""}</span></div>${evt}${extra}${tiempos}</div>`;
+}
+
+/* ---------------- reloj para la hora de los eventos de vuelo ---------------- */
+const pad2 = n => String(n).padStart(2, "0");
+const horaActual = () => { const d = new Date(); return pad2(d.getHours()) + ":" + pad2(d.getMinutes()); };
+function relojEvento(key, ev) {
+  const v = S.horaSel?.k === key ? S.horaSel.v : horaActual();
+  return `<div class="reloj noprint"><label for="horaEv"><span>Hora de ${ev}</span><input type="time" id="horaEv" data-k="${key}" value="${v}"></label>
+    <button type="button" class="pri" data-a="hora-reloj">🕐 Elegir hora</button><button type="button" data-a="hora-ahora" data-k="${key}">Ahora</button></div>`;
+}
+/* "HH:MM" elegido → fecha completa. Si queda más de una hora en el futuro, es de ayer (vuelo cerca de medianoche). */
+function horaAFecha(hhmm) {
+  const [h, m] = String(hhmm).split(":").map(Number); if (isNaN(h) || isNaN(m)) return null;
+  const ahora = new Date(), d = new Date(ahora); d.setHours(h, m, 0, 0);
+  if (d - ahora > 60 * 60 * 1000) d.setDate(d.getDate() - 1);
+  return d;
+}
+/* Último evento ya registrado antes del paso indicado (para no aceptar horas fuera de orden). */
+function eventoAnterior(rec, key) {
+  let prev = null;
+  for (const p of pasos(rec)) {
+    if (p.key === key) break;
+    const r = rec.resp[p.key], e = p.kind === "item" && evDe(p.it);
+    if (e && r && r.r !== "na") prev = { ev: e, t: r.h || r.t };
+  }
+  return prev;
 }
 
 function grupos(st) {
@@ -651,8 +680,23 @@ setInterval(async () => {
 async function responder(key, r, n) {
   prepararAudio(); silenciar(); mantenerPantalla(true);
   const rec = S.cur; if (rec.estado === "cerrada") return;
-  if (progreso(rec).next?.key !== key) return; // obliga el orden
-  rec.resp[key] = { r, t: nowIso(), ...(n ? { n } : {}) }; rec._ult = key; S.noteFor = null;
+  const paso = progreso(rec).next;
+  if (paso?.key !== key) return; // obliga el orden
+  // Eventos de vuelo: la hora es la que el piloto deja en el reloj (por defecto, la actual).
+  const ev = paso.kind === "item" && evDe(paso.it);
+  let h = null;
+  if (ev && r !== "na") {
+    const valor = $("#horaEv")?.value || (S.horaSel?.k === key ? S.horaSel.v : horaActual());
+    const d = horaAFecha(valor);
+    if (!d) { toast(`Seleccione la hora de ${ev}.`); $("#horaEv")?.focus(); return; }
+    if (d - Date.now() > 60000) { toast(`La hora de ${ev} (${valor}) no puede ser posterior a la hora actual.`, 4500); return; }
+    const prev = eventoAnterior(rec, key);
+    if (prev && d < new Date(prev.t).setSeconds(0, 0)) { toast(`La hora de ${ev} (${valor}) no puede ser anterior a ${prev.ev} (${fmtHM(prev.t)}).`, 5000); return; }
+    h = d.toISOString();
+  }
+  const t = nowIso();
+  rec.resp[key] = { r, t, ...(h ? { h } : {}), ...(n ? { n } : {}) }; rec._ult = key; S.noteFor = null; S.horaSel = null;
+  if (h && Math.abs(new Date(h) - new Date(t)) >= 60000) log(rec, "hora-evento", { paso: key, evento: ev, hora: h });
   render(); await guardar(rec); setTimeout(irAlPaso, 40);
 }
 
@@ -673,6 +717,8 @@ document.addEventListener("click", async ev => {
   }
   else if (a === "buscar-cc") { const sfx = b.dataset.sfx || ""; mostrarPiloto(sfx); if (!S["pilotoSel" + sfx] && basePilotos() && soloDig($("#cedula" + sfx).value)) toast("Cédula no encontrada en la base de pilotos."); }
   else if (a === "res" || a === "dec") responder(b.dataset.k, b.dataset.r);
+  else if (a === "hora-reloj") { const i = $("#horaEv"); if (!i) return; i.focus(); try { i.showPicker(); } catch (e) { i.click(); } }
+  else if (a === "hora-ahora") { const i = $("#horaEv"); if (i) { i.value = horaActual(); S.horaSel = { k: b.dataset.k, v: i.value }; } }
   else if (a === "nov") { S.noteFor = b.dataset.k; render(); const t = $("#nota"); t?.focus(); }
   else if (a === "nov-no") { S.noteFor = null; render(); irAlPaso(); }
   else if (a === "nov-ok") { const n = $("#nota").value.trim(); if (!n) { toast("Escriba la novedad antes de registrarla."); $("#nota").focus(); return; } responder(b.dataset.k, "nov", n); }
@@ -715,6 +761,7 @@ document.addEventListener("click", async ev => {
 
 document.addEventListener("input", ev => {
   if (ev.target.id === "cedula" || ev.target.id === "cedula2") { const sfx = ev.target.id === "cedula2" ? "2" : ""; clearTimeout(S["_ccT" + sfx]); S["_ccT" + sfx] = setTimeout(() => mostrarPiloto(sfx), 350); }
+  if (ev.target.id === "horaEv") S.horaSel = { k: ev.target.dataset.k, v: ev.target.value }; // se conserva si abre NOVEDAD
   if (ev.target.id === "filtro") { S.filtro = ev.target.value; const pos = ev.target.selectionStart; render(); const f = $("#filtro"); f.focus(); f.setSelectionRange(pos, pos); }
 });
 
